@@ -1,0 +1,15 @@
+G1 evidence (10 Oct 2026)
+
+1. Prompt through llm.py (python -m friday.cli "Say hello in 5 words."):
+Hello, how are you today?
+[groq openai/gpt-oss-20b 2912 ms | run 47eb28f177f3]
+(2912 ms is a single sample, not a benchmark.)
+
+2. Exchange saved in SQLite and traced (query on data/friday.db):
+messages: [{'role': 'assistant', 'content': 'Hello, how are you today?'}, {'role': 'user', 'content': 'Say hello in 5 words.'}]
+traces: [{'run_id': '47eb28f177f3', 'step': 'save_reply', 'ms': 6}, {'run_id': '47eb28f177f3', 'step': 'llm', 'ms': 2912}, {'run_id': '47eb28f177f3', 'step': 'save_user_message', 'ms': 17}]
+
+3. Unit tests and limits:
+pytest: 14 passed in 1.02s
+ruff check: All checks passed!
+Groq and Gemini limits: docs/limits.md (checked 10 Oct 2026)
