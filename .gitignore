@@ -218,3 +218,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Friday project
+.env
+.secrets/
+.venv/
+data/
+models/
+*.onnx
+credentials.json
+token.json
+client_secret*.json
