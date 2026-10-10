@@ -1,0 +1,8 @@
+P2-04: Bluetooth output test (10 Oct 2026)
+
+Output: Stone 358 Pro (Windows default output).
+Test: python -m friday.voice.tts, 2 runs.
+Console (single samples): voice load 5739 ms; first sentence ready 136 ms and 160 ms.
+By ear: speech started right after load, no gaps between sentences, no noticeable extra delay.
+Not measured: real Bluetooth delay. The console times stop before the audio device.
+Real voice-to-voice latency comes from P2-06.
