@@ -73,7 +73,10 @@ class TextToSpeech:
                 rate, audio = item
                 if stream is None:
                     first_ms = int((time.perf_counter() - start) * 1000)
-                    stream = sd.OutputStream(samplerate=rate, channels=1, dtype="int16")
+                    # latency="high" = bigger device buffer, to test against Bluetooth crackle
+                    stream = sd.OutputStream(
+                        samplerate=rate, channels=1, dtype="int16", latency="high"
+                    )
                     stream.start()
                 data = np.ascontiguousarray(audio, dtype=np.int16).reshape(-1, 1)
                 stream.write(data)
