@@ -1,5 +1,6 @@
 annotated-types==0.8.0
 anyio==4.15.1
+APScheduler==3.11.3
 av==19.0.1
 certifi==2026.7.22
 cffi==2.1.1
@@ -64,6 +65,8 @@ tqdm==4.70.1
 truststore==0.10.4
 typing-inspection==0.4.4
 typing_extensions==4.16.0
+tzdata==2026.5
+tzlocal==5.4.4
 urllib3==2.8.0
 uuid_utils==0.17.1
 websockets==16.1.1

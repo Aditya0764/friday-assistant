@@ -97,3 +97,34 @@ def get_traces(conn: sqlite3.Connection, run_id: str) -> list[dict]:
         "SELECT step, input, output, ms FROM traces WHERE run_id = ? ORDER BY id", (run_id,)
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def add_reminder(conn: sqlite3.Connection, text: str, due_at: datetime) -> int:
+    """Save a reminder. text is exactly what Friday will say when it fires.
+
+    due_at must be timezone-aware; it is stored in UTC.
+    """
+    if due_at.tzinfo is None:
+        raise ValueError("due_at must be timezone-aware")
+    cur = conn.execute(
+        "INSERT INTO reminders (text, due_at, done, created_at) VALUES (?, ?, 0, ?)",
+        (text, due_at.astimezone(UTC).isoformat(timespec="seconds"), _now()),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def pending_reminders(conn: sqlite3.Connection) -> list[dict]:
+    """Reminders not yet spoken, soonest first. due_at comes back as an aware datetime."""
+    rows = conn.execute(
+        "SELECT id, text, due_at FROM reminders WHERE done = 0 ORDER BY due_at, id"
+    ).fetchall()
+    return [
+        {"id": row["id"], "text": row["text"], "due_at": datetime.fromisoformat(row["due_at"])}
+        for row in rows
+    ]
+
+
+def mark_reminder_done(conn: sqlite3.Connection, reminder_id: int) -> None:
+    conn.execute("UPDATE reminders SET done = 1 WHERE id = ?", (reminder_id,))
+    conn.commit()
