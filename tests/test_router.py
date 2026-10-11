@@ -23,6 +23,12 @@ def test_normalize_collapses_spaces():
     assert normalize("repeat   after,  me.") == "repeat after me"
 
 
+def test_normalize_keeps_numbers_and_math_symbols():
+    assert normalize("What's 18% of 2,400?") == "what's 18% of 2400"
+    assert normalize("Calculate (2 + 3) * 4.") == "calculate (2 + 3) * 4"
+    assert normalize("What is 3.5 times 2?") == "what is 3.5 times 2"
+
+
 @pytest.mark.parametrize(
     ("sentence", "skill_name"),
     [

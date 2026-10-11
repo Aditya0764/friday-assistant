@@ -4,7 +4,8 @@ route(text) cleans the sentence and asks the skill registry who can handle it.
 A skill that says yes is a rule match (via="rule"). If none does, the sentence
 goes to the LLM (skill=None, via="llm").
 
-can_handle receives the CLEAN text (lowercase, no punctuation).
+can_handle receives the CLEAN text (lowercase, no punctuation, but numbers and
+math symbols survive: "What's 18% of 2,400?" -> "what's 18% of 2400").
 args["text"] is what the user said; args["clean"] is the cleaned version.
 
 The trained router (Phase 6) replaces this file. Callers keep using route().
@@ -27,8 +28,15 @@ class Route:
 
 
 def normalize(text: str) -> str:
-    """Lowercase, drop punctuation (keep apostrophes), collapse spaces."""
-    text = re.sub(r"[^\w\s']", " ", text.lower())
+    """Lowercase and drop punctuation, but keep what math and conversions need.
+
+    Kept: apostrophes, % + - * / ^ ( ), and dots inside numbers (3.5).
+    Thousands commas inside numbers are removed (2,400 -> 2400).
+    """
+    text = text.lower()
+    text = re.sub(r"(?<=\d),(?=\d{3}\b)", "", text)
+    text = re.sub(r"[^\w\s'%+\-*/^().]", " ", text)
+    text = re.sub(r"(?<!\d)\.|\.(?!\d)", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
