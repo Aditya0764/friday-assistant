@@ -1,0 +1,44 @@
+# Acceptance tests: daily requests Friday must pass by the end of v1.
+# Written 11 Oct 2026 (task P3-06). Picked from the v1 skill examples; replace with
+# your own phrasing any time. "status" stays pending until the skill exists and
+# I have checked it by voice.
+
+tests:
+  - id: A1
+    say: "Remind me at 6 to apply for jobs"
+    skill: reminders
+    expected:
+      - A reminder "apply for jobs" is saved for 6 PM.
+      - Friday confirms out loud.
+      - The reminder is still saved after restarting Friday.
+    status: pending
+
+  - id: A2
+    say: "Add milk to my shopping list"
+    skill: lists
+    expected:
+      - '"milk" is saved on the shopping list.'
+      - Friday confirms out loud.
+    status: pending
+
+  - id: A3
+    say: "Play Blinding Lights"
+    skill: music
+    expected:
+      - The song starts playing on Spotify through the speaker.
+      - Friday confirms what is playing.
+    status: pending
+
+  - id: A4
+    say: "What's 18% of 2,400?"
+    skill: math
+    expected:
+      - Friday says 432.
+      - The answer comes from the safe math parser, not from the LLM.
+    status: pending
+
+# Wishes that are NOT in v1 (new ideas go to the Backlog). Not counted as tests.
+deferred:
+  - say: "What's my schedule for the day and any important meetings lined up today?"
+    skill: calendar
+    note: Backlog B4 (calendar API not set up yet).
