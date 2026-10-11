@@ -3,14 +3,20 @@
 Run `python -m friday.voice.loop`. Hold the key, speak, release, listen.
 Ctrl+C to quit. Memory = last MEMORY_TURNS turns from SQLite (sent only to the LLM).
 One spoken command = one run_id: record, stt, router, safety/skill or llm, reply, tts.
+
+Reminders: a background scheduler speaks them when they are due. A lock makes sure a
+reminder never talks over a reply (it waits until the reply is finished).
 """
 
 from __future__ import annotations
 
+import threading
 import time
+from contextlib import AbstractContextManager, nullcontext
 
 from friday import db
 from friday.graph import build_graph
+from friday.scheduler import ReminderScheduler
 from friday.skills.registry import build_registry
 from friday.trace import Tracer
 from friday.voice.audio import DEFAULT_KEY, record_while_held
@@ -32,8 +38,9 @@ def load_history(conn) -> list[dict]:
     return history
 
 
-def handle_turn(conn, app, stt, tts) -> bool:
+def handle_turn(conn, app, stt, tts, speak_lock: AbstractContextManager | None = None) -> bool:
     """Run one turn. Returns False if the clip was ignored."""
+    speak_lock = speak_lock or nullcontext()
     cap = record_while_held()
     released = time.perf_counter()  # key release: start of the timing below
 
@@ -71,7 +78,7 @@ def handle_turn(conn, app, stt, tts) -> bool:
         out["output"] = "saved"
 
     # The tts step time includes playback, so first_audio_ms is logged in the output.
-    with tracer.step("tts", reply) as out:
+    with tracer.step("tts", reply) as out, speak_lock:
         spoken = tts.speak(reply)
         out["output"] = (
             f"{spoken.sentences} sentences, first audio ready {spoken.first_audio_ms} ms"
@@ -87,19 +94,32 @@ def main() -> None:
     print("Loading models (once)...")
     stt = get_stt()
     tts = get_tts()
-    registry = build_registry()
+
+    speak_lock = threading.Lock()  # one voice at a time: replies and reminders take turns
+
+    def say(text: str) -> None:
+        print(f"Friday (reminder): {text!r}")
+        with speak_lock:
+            tts.speak(text)
+
+    scheduler = ReminderScheduler(say)
+    restored = scheduler.start()
+    registry = build_registry(scheduler)
     app = build_graph(conn, registry, llm_suffix=VOICE_HINT)
     print(f"Skills: {', '.join(registry.names())}")
+    print(f"Reminders waiting: {restored}")
     print(f"Ready. Hold [{DEFAULT_KEY}], speak, release. Ctrl+C to quit.")
 
     try:
         while True:
             try:
-                handle_turn(conn, app, stt, tts)
+                handle_turn(conn, app, stt, tts, speak_lock)
             except Exception as exc:  # noqa: BLE001 - keep the loop alive after one bad turn
                 print(f"Turn failed: {exc}")
     except KeyboardInterrupt:
         print("\nBye.")
+    finally:
+        scheduler.shutdown()
 
 
 if __name__ == "__main__":
