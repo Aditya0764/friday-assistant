@@ -3,6 +3,7 @@
 Order matters: the first skill that can_handle a sentence wins.
 Skills that need a running service (the reminder scheduler) are only added when
 that service is passed in, so tests and self-checks can build a registry without it.
+The catch skill must stay last: it only handles garbled commands nobody else took.
 Run `python -m friday.skills.registry` to check what the router does with a few sentences.
 """
 
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 from friday.skills.base import SkillRegistry
 from friday.skills.calc import CalcSkill
+from friday.skills.catch import CatchSkill
 from friday.skills.clock import ClockSkill
 from friday.skills.echo import EchoSkill
 from friday.skills.lists import ListsSkill
@@ -24,6 +26,7 @@ def build_registry(scheduler=None, db_path=None) -> SkillRegistry:
     registry.register(CalcSkill())
     if scheduler is not None:
         registry.register(ReminderSkill(scheduler))
+    registry.register(CatchSkill(reminders=scheduler is not None))  # always last
     return registry
 
 
@@ -51,6 +54,8 @@ if __name__ == "__main__":
             "What's on my shopping list?",
             "Remove eggs from my shopping list.",
             "Take a note that the demo is on Friday.",
+            "I'll milk to my shopping list.",
+            "Remind me to apply it to 6 jobs.",
             "Echo hello Friday.",
             "Tell me a fun fact.",
         ):
