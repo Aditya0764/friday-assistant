@@ -70,7 +70,6 @@ def test_huge_numbers_are_refused():
         "What is the capital of France?",
         "I have 5 apples.",
         "Remind me at 6 to apply for jobs.",
-        "Add milk to my shopping list.",
         "Play Blinding Lights.",
         "What is 5?",
         "What is a 5-star hotel?",

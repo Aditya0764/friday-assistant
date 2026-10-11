@@ -128,3 +128,26 @@ def pending_reminders(conn: sqlite3.Connection) -> list[dict]:
 def mark_reminder_done(conn: sqlite3.Connection, reminder_id: int) -> None:
     conn.execute("UPDATE reminders SET done = 1 WHERE id = ?", (reminder_id,))
     conn.commit()
+
+
+def add_list_item(conn: sqlite3.Connection, list_name: str, item: str) -> int:
+    """Add an item to a named list (the list exists as soon as it has an item)."""
+    cur = conn.execute(
+        "INSERT INTO list_items (list_name, item, created_at) VALUES (?, ?, ?)",
+        (list_name, item, _now()),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_list_items(conn: sqlite3.Connection, list_name: str) -> list[dict]:
+    """Items on one list, oldest first, as {"id", "item"}."""
+    rows = conn.execute(
+        "SELECT id, item FROM list_items WHERE list_name = ? ORDER BY id", (list_name,)
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def delete_list_item(conn: sqlite3.Connection, item_id: int) -> None:
+    conn.execute("DELETE FROM list_items WHERE id = ?", (item_id,))
+    conn.commit()
