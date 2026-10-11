@@ -16,6 +16,7 @@ from contextlib import AbstractContextManager, nullcontext
 
 from friday import db
 from friday.graph import build_graph
+from friday.prompt import FRIDAY_PROMPT
 from friday.scheduler import ReminderScheduler
 from friday.skills.registry import build_registry
 from friday.trace import Tracer
@@ -25,9 +26,6 @@ from friday.voice.tts import get_tts
 
 MIN_SECONDS = 0.3  # shorter than this is treated as an accidental tap
 MEMORY_TURNS = 6  # one turn = your message + Friday's reply
-
-# Temporary: keeps spoken LLM replies short until Phase 3+ adds proper prompting.
-VOICE_HINT = "\n\n(Reply in 1 to 3 short sentences, plain text, no markdown.)"
 
 
 def load_history(conn) -> list[dict]:
@@ -105,7 +103,7 @@ def main() -> None:
     scheduler = ReminderScheduler(say)
     restored = scheduler.start()
     registry = build_registry(scheduler)
-    app = build_graph(conn, registry, llm_suffix=VOICE_HINT)
+    app = build_graph(conn, registry, system_prompt=FRIDAY_PROMPT)
     print(f"Skills: {', '.join(registry.names())}")
     print(f"Reminders waiting: {restored}")
     print(f"Ready. Hold [{DEFAULT_KEY}], speak, release. Ctrl+C to quit.")

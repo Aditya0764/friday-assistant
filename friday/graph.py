@@ -4,7 +4,8 @@ Every node writes one trace row (input, output, ms) under the same run_id.
 - router: rules first (friday.router.router); no match means the LLM handles it.
 - safety: a skill with needs_approval=True only runs if approve(skill_name) says yes.
   With no approve function, risky skills are denied.
-- skill / llm: produce the reply text.
+- skill / llm: produce the reply text. The llm node sends the system prompt first (if
+  one is given), then the chat history, then the user's sentence.
 - reply: final node (the caller speaks or shows state["reply"]).
 
 Saving messages and memory stay with the caller (voice loop), not the graph.
@@ -44,8 +45,13 @@ def build_graph(
     approve: Callable[[str], bool] | None = None,
     llm: Callable = ask,
     llm_suffix: str = "",
+    system_prompt: str = "",
 ):
-    """Compile the graph. llm_suffix is appended to the user text sent to the LLM."""
+    """Compile the graph.
+
+    system_prompt: who Friday is and what it must not claim (sent first to the LLM).
+    llm_suffix: optional text appended to the user's sentence (kept for old callers).
+    """
     router = Router(registry)
 
     def tracer_for(state: State) -> Tracer:
@@ -87,8 +93,11 @@ def build_graph(
 
     def llm_node(state: State) -> dict:
         user_text = state["text"] + llm_suffix
-        messages = [*state.get("history", []), {"role": "user", "content": user_text}]
-        with tracer_for(state).step("llm", f"[{len(messages) - 1} history msgs] {state['text']}") as out:
+        history = state.get("history", [])
+        messages = [*history, {"role": "user", "content": user_text}]
+        if system_prompt:
+            messages = [{"role": "system", "content": system_prompt}, *messages]
+        with tracer_for(state).step("llm", f"[{len(history)} history msgs] {state['text']}") as out:
             result = llm(messages)
             out["output"] = f"{result.provider}/{result.model}: {result.text}"
         return {"reply": result.text, "provider": result.provider}
