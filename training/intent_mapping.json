@@ -1,0 +1,28 @@
+{
+  "source": "MASSIVE 1.1 en-US (official tar, 16521 rows: 11514 train / 2033 dev / 2974 test)",
+  "classes": ["timers_reminders", "lists_notes", "math_time", "music", "doc_qa", "other"],
+  "intent_to_class": {
+    "alarm_set": "timers_reminders",
+    "alarm_query": "timers_reminders",
+    "alarm_remove": "timers_reminders",
+    "lists_createoradd": "lists_notes",
+    "lists_query": "lists_notes",
+    "lists_remove": "lists_notes",
+    "datetime_query": "math_time",
+    "qa_maths": "math_time",
+    "play_music": "music",
+    "audio_volume_up": "music",
+    "audio_volume_down": "music",
+    "audio_volume_mute": "music",
+    "audio_volume_other": "music"
+  },
+  "extra_rule": "calendar_set rows whose utt contains 'remind' -> timers_reminders",
+  "default": "other",
+  "notes": [
+    "other = send to LLM (includes general_* chat, calendar, email, iot, weather, news, qa_factoid, datetime_convert, music_settings, etc.)",
+    "doc_qa has no MASSIVE rows; examples come only from own-phrasing set (T-06)",
+    "timers, unit conversion, music transport (pause/next) are almost absent in MASSIVE; covered by T-06",
+    "datetime_convert is mostly time zones; clock skill has no time-zone support, so it stays in other",
+    "most MASSIVE reminder phrasing is labeled calendar_set, hence the extra rule"
+  ]
+}
