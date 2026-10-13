@@ -132,3 +132,31 @@ other|why is my phone alarm so loud
 other|what does remind mean
 other|give me a list of cricketers
 other|who won the 2010 fifa world cup
+doc_qa|what does this pdf say about virat kohli
+doc_qa|what are the main points in this file
+doc_qa|how many pages are there in this document
+doc_qa|who sent this document, who wrote it
+doc_qa|whats the conclusion or skip to the last part
+doc_qa|read page 2
+doc_qa|start reading from the beginning
+doc_qa|stop reading , read the pdf again from the start
+doc_qa|does this document say yes or no to a certain thing
+doc_qa|give a short 2 line summary of the whole document
+other|whats the definition of pen
+doc_qa|pdf pages ?, deadline ?
+doc_qa|check the file for any information about trees
+doc_qa|i need you to explain to me, like you would explain to a 10 year old, the contents of this document
+lists_notes|i need to buy a pair of socks , put this in my list ,write down apple in my list
+timers_reminders|remind me to pick up eggs bread on the way back
+lists_notes|add protein milk in gym list
+lists_notes|take out email from to do list
+lists_notes|tell me my gym list
+lists_notes|friday read out my to do list for today
+lists_notes|create a cricket list
+lists_notes|delete the cricket list
+lists_notes|note this idea down
+lists_notes|can you read my last note
+lists_notes|check if eggs is there in the gym list
+lists_notes|tell me all my lists
+lists_notes|put rice
+lists_notes|add 3 kilos of meat

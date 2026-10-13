@@ -71,3 +71,17 @@ other|whats the price of one mrf stock currently
 other|why is my phone alarm so loud
 other|what does remind mean
 other|who won the 2010 fifa world cup
+doc_qa|what does this pdf say about virat kohli
+doc_qa|who sent this document, who wrote it
+doc_qa|start reading from the beginning
+doc_qa|stop reading , read the pdf again from the start
+doc_qa|does this document say yes or no to a certain thing
+doc_qa|pdf pages ?, deadline ?
+timers_reminders|remind me to pick up eggs bread on the way back
+lists_notes|add protein milk in gym list
+lists_notes|take out email from to do list
+lists_notes|create a cricket list
+lists_notes|delete the cricket list
+lists_notes|can you read my last note
+lists_notes|put rice
+lists_notes|add 3 kilos of meat

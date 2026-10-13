@@ -58,3 +58,17 @@ other|thanks friday
 other|im bored bro
 other|who sang despacito
 other|give me a list of cricketers
+doc_qa|what are the main points in this file
+doc_qa|how many pages are there in this document
+doc_qa|whats the conclusion or skip to the last part
+doc_qa|read page 2
+doc_qa|give a short 2 line summary of the whole document
+other|whats the definition of pen
+doc_qa|check the file for any information about trees
+doc_qa|i need you to explain to me, like you would explain to a 10 year old, the contents of this document
+lists_notes|i need to buy a pair of socks , put this in my list ,write down apple in my list
+lists_notes|tell me my gym list
+lists_notes|friday read out my to do list for today
+lists_notes|note this idea down
+lists_notes|check if eggs is there in the gym list
+lists_notes|tell me all my lists
