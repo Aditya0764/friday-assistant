@@ -34,8 +34,16 @@ Accuracy 0.9657, macro-F1 0.9326
 | Test accuracy | 0.9519 | 0.9657 |
 | Test macro-F1 | 0.9066 | 0.9326 |
 
+## Reproduction (14 Oct 2026)
+Re-ran training/finetune_router.py (commit 18c97be) from scratch in a fresh Kaggle session (one T4).
+Train losses, dev metrics, test accuracy 0.9657, macro-F1 0.9326 and the per-class table matched
+the first run to every printed digit. Training took 97.2 s (first run 99.3 s).
+The weights from the second run were not downloaded or compared bit for bit.
+models/router_distilbert on the laptop is from the first run (zip SHA256 cf68e72e...bf391).
+
 ## Caveats
-- One run, one seed. Hyperparameters were not tuned; the baseline got a 6-config search, this got one config.
+- One run, one seed (reproduced once with the same seed). Hyperparameters were not tuned;
+  the baseline got a 6-config search, this got one config.
 - 5 classes only: doc_qa has no MASSIVE rows (own-phrasing set, T-06).
 - The "remind" relabel rule means the model may partly learn that word.
 - MASSIVE-only numbers. Own-phrasing accuracy is reported separately (T-06).
