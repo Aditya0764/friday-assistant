@@ -1,0 +1,444 @@
+{
+  "date": "2026-10-13",
+  "k": 4,
+  "results": [
+    {
+      "setting": "production",
+      "chunk_words": 500,
+      "overlap_words": 50,
+      "chunks_per_doc": {
+        "cycling_club.txt": 1,
+        "friday_notes.pdf": 1,
+        "library_rules.txt": 1
+      },
+      "retrieval_hits": 16,
+      "in_doc_total": 16,
+      "in_doc_correct": 16,
+      "refusals_correct": 4,
+      "out_doc_total": 4,
+      "all_correct": 20,
+      "total": 20,
+      "rows": [
+        {
+          "id": 1,
+          "question": "Which key is used for push-to-talk?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The push\u2011to\u2011talk key is the Right Ctrl key.",
+          "ms": 1165
+        },
+        {
+          "id": 2,
+          "question": "What does Friday fall back to if Groq fails?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "Friday falls back to Gemini.",
+          "ms": 969
+        },
+        {
+          "id": 3,
+          "question": "Which device does the music play on?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The music skill plays only on the device named ADI7. It never falls back to another device.",
+          "ms": 1148
+        },
+        {
+          "id": 4,
+          "question": "How many turns of conversation does the chat skill remember?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The chat skill remembers the last six turns of conversation. Each turn consists of a user message and Friday\u2019s reply.",
+          "ms": 981
+        },
+        {
+          "id": 5,
+          "question": "What is the table for lists and notes called?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The table for lists and notes is called list_items. It stores all list items and notes.",
+          "ms": 3526
+        },
+        {
+          "id": 6,
+          "question": "Which Piper voice does Friday use?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "Friday uses Piper with the en_US-amy-medium voice. This voice is used for all text to speech replies.",
+          "ms": 960
+        },
+        {
+          "id": 7,
+          "question": "Who founded the Kaveri Cycling Club?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The Kaveri Cycling Club was founded in 2014 by Meera Rao.",
+          "ms": 991
+        },
+        {
+          "id": 8,
+          "question": "How much do students pay for club membership?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "Students pay 900 rupees per year for club membership.",
+          "ms": 1816
+        },
+        {
+          "id": 9,
+          "question": "How fast does the Red group ride?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The Red group rides at 30 kilometres per hour.",
+          "ms": 8943
+        },
+        {
+          "id": 10,
+          "question": "Who drives the support van?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The support van is driven by Imran Sheikh.",
+          "ms": 8484
+        },
+        {
+          "id": 11,
+          "question": "Where is the annual club dinner held?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The annual club dinner is held at the Lalitha Mahal lawn. It takes place in December.",
+          "ms": 8436
+        },
+        {
+          "id": 12,
+          "question": "What is the maximum late fee for a book?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "Late fees are 2 rupees per day per book, capped at 100 rupees. The maximum fee you can pay is 100 rupees. That is the limit.",
+          "ms": 9793
+        },
+        {
+          "id": 13,
+          "question": "How many books can a member borrow at a time?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "Members can borrow up to four books at a time.",
+          "ms": 8405
+        },
+        {
+          "id": 14,
+          "question": "Who is the head librarian?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "Mrs. Kavitha Reddy is the head librarian. She oversees the library's operations.",
+          "ms": 9481
+        },
+        {
+          "id": 15,
+          "question": "How many seats are in the reading room?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "There are 40 seats in the reading room. Silence is required there.",
+          "ms": 10530
+        },
+        {
+          "id": 16,
+          "question": "When is the children's story hour?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The children\u2019s story hour is held every Saturday at 11\u202fAM.",
+          "ms": 9558
+        },
+        {
+          "id": 17,
+          "question": "What is the cycling club's Instagram handle?",
+          "in_doc": false,
+          "retrieval_hit": null,
+          "grounded": false,
+          "correct": true,
+          "reply": "That's not in the document.",
+          "ms": 9641
+        },
+        {
+          "id": 18,
+          "question": "Does the library have a cafe?",
+          "in_doc": false,
+          "retrieval_hit": null,
+          "grounded": false,
+          "correct": true,
+          "reply": "That's not in the document.",
+          "ms": 6313
+        },
+        {
+          "id": 19,
+          "question": "What is Friday's wake word?",
+          "in_doc": false,
+          "retrieval_hit": null,
+          "grounded": false,
+          "correct": true,
+          "reply": "That's not in the document.",
+          "ms": 8587
+        },
+        {
+          "id": 20,
+          "question": "Who is the treasurer of the cycling club?",
+          "in_doc": false,
+          "retrieval_hit": null,
+          "grounded": false,
+          "correct": true,
+          "reply": "That's not in the document.",
+          "ms": 7479
+        }
+      ]
+    },
+    {
+      "setting": "stress",
+      "chunk_words": 40,
+      "overlap_words": 8,
+      "chunks_per_doc": {
+        "cycling_club.txt": 7,
+        "friday_notes.pdf": 10,
+        "library_rules.txt": 5
+      },
+      "retrieval_hits": 14,
+      "in_doc_total": 16,
+      "in_doc_correct": 14,
+      "refusals_correct": 4,
+      "out_doc_total": 4,
+      "all_correct": 18,
+      "total": 20,
+      "rows": [
+        {
+          "id": 1,
+          "question": "Which key is used for push-to-talk?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The push\u2011to\u2011talk key is the Right Ctrl key. Holding that key while speaking activates Friday. This is the method described in the project notes.",
+          "ms": 4071
+        },
+        {
+          "id": 2,
+          "question": "What does Friday fall back to if Groq fails?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "Friday falls back to Gemini. That is the backup model used when Groq fails.",
+          "ms": 5152
+        },
+        {
+          "id": 3,
+          "question": "Which device does the music play on?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The music plays only on the device named ADI7.",
+          "ms": 2991
+        },
+        {
+          "id": 4,
+          "question": "How many turns of conversation does the chat skill remember?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The chat skill remembers the last six turns of conversation.",
+          "ms": 3034
+        },
+        {
+          "id": 5,
+          "question": "What is the table for lists and notes called?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The table for lists and notes is called list_items. It is used to store both lists and notes. This is mentioned in the document.",
+          "ms": 3911
+        },
+        {
+          "id": 6,
+          "question": "Which Piper voice does Friday use?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "Friday uses the en_US\u2011amy\u2011medium voice.",
+          "ms": 4955
+        },
+        {
+          "id": 7,
+          "question": "Who founded the Kaveri Cycling Club?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The Kaveri Cycling Club was founded by Meera Rao.",
+          "ms": 4112
+        },
+        {
+          "id": 8,
+          "question": "How much do students pay for club membership?",
+          "in_doc": true,
+          "retrieval_hit": false,
+          "grounded": true,
+          "correct": false,
+          "reply": "Students pay 300 rupees per year for club membership.",
+          "ms": 2309
+        },
+        {
+          "id": 9,
+          "question": "How fast does the Red group ride?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The Red group rides at 30 kilometres per hour. They are the fast riders.",
+          "ms": 4456
+        },
+        {
+          "id": 10,
+          "question": "Who drives the support van?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The support van is driven by Imran Sheikh.",
+          "ms": 6803
+        },
+        {
+          "id": 11,
+          "question": "Where is the annual club dinner held?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The annual club dinner is held at the Lalitha Mahal lawn. It takes place in December.",
+          "ms": 3119
+        },
+        {
+          "id": 12,
+          "question": "What is the maximum late fee for a book?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "Late fees are 2 rupees per day per book. The fee is capped at 100 rupees.",
+          "ms": 5152
+        },
+        {
+          "id": 13,
+          "question": "How many books can a member borrow at a time?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "A member can borrow up to 4 books at a time. The library allows each member to take 4 books for a 21\u2011day period. That is the maximum number of books per borrowing period.",
+          "ms": 3932
+        },
+        {
+          "id": 14,
+          "question": "Who is the head librarian?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The head librarian is Mrs. Kavitha Reddy.",
+          "ms": 1853
+        },
+        {
+          "id": 15,
+          "question": "How many seats are in the reading room?",
+          "in_doc": true,
+          "retrieval_hit": true,
+          "grounded": true,
+          "correct": true,
+          "reply": "The reading room on the second floor has 40 seats. So the library has 40 seats in the reading room.",
+          "ms": 5062
+        },
+        {
+          "id": 16,
+          "question": "When is the children's story hour?",
+          "in_doc": true,
+          "retrieval_hit": false,
+          "grounded": false,
+          "correct": false,
+          "reply": "That's not in the document.",
+          "ms": 3692
+        },
+        {
+          "id": 17,
+          "question": "What is the cycling club's Instagram handle?",
+          "in_doc": false,
+          "retrieval_hit": null,
+          "grounded": false,
+          "correct": true,
+          "reply": "That's not in the document.",
+          "ms": 4152
+        },
+        {
+          "id": 18,
+          "question": "Does the library have a cafe?",
+          "in_doc": false,
+          "retrieval_hit": null,
+          "grounded": false,
+          "correct": true,
+          "reply": "That's not in the document.",
+          "ms": 2985
+        },
+        {
+          "id": 19,
+          "question": "What is Friday's wake word?",
+          "in_doc": false,
+          "retrieval_hit": null,
+          "grounded": false,
+          "correct": true,
+          "reply": "That's not in the document.",
+          "ms": 4548
+        },
+        {
+          "id": 20,
+          "question": "Who is the treasurer of the cycling club?",
+          "in_doc": false,
+          "retrieval_hit": null,
+          "grounded": false,
+          "correct": true,
+          "reply": "That's not in the document.",
+          "ms": 3812
+        }
+      ]
+    }
+  ]
+}

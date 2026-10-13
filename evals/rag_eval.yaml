@@ -1,0 +1,24 @@
+# RAG mini eval: 20 questions over 3 documents (evals/docs).
+# 16 are answered by a document. 4 are NOT in any document (the right reply is a refusal).
+# answer_any: the reply is correct if it contains any one of these (case-insensitive).
+questions:
+  - {id: 1,  doc: friday_notes.pdf,    in_doc: true,  question: "Which key is used for push-to-talk?", answer_any: ["ctrl"]}
+  - {id: 2,  doc: friday_notes.pdf,    in_doc: true,  question: "What does Friday fall back to if Groq fails?", answer_any: ["gemini"]}
+  - {id: 3,  doc: friday_notes.pdf,    in_doc: true,  question: "Which device does the music play on?", answer_any: ["adi7"]}
+  - {id: 4,  doc: friday_notes.pdf,    in_doc: true,  question: "How many turns of conversation does the chat skill remember?", answer_any: ["six", "6"]}
+  - {id: 5,  doc: friday_notes.pdf,    in_doc: true,  question: "What is the table for lists and notes called?", answer_any: ["list_items"]}
+  - {id: 6,  doc: friday_notes.pdf,    in_doc: true,  question: "Which Piper voice does Friday use?", answer_any: ["amy"]}
+  - {id: 7,  doc: cycling_club.txt,    in_doc: true,  question: "Who founded the Kaveri Cycling Club?", answer_any: ["meera"]}
+  - {id: 8,  doc: cycling_club.txt,    in_doc: true,  question: "How much do students pay for club membership?", answer_any: ["900"]}
+  - {id: 9,  doc: cycling_club.txt,    in_doc: true,  question: "How fast does the Red group ride?", answer_any: ["30"]}
+  - {id: 10, doc: cycling_club.txt,    in_doc: true,  question: "Who drives the support van?", answer_any: ["imran"]}
+  - {id: 11, doc: cycling_club.txt,    in_doc: true,  question: "Where is the annual club dinner held?", answer_any: ["lalitha"]}
+  - {id: 12, doc: library_rules.txt,   in_doc: true,  question: "What is the maximum late fee for a book?", answer_any: ["100", "hundred"]}
+  - {id: 13, doc: library_rules.txt,   in_doc: true,  question: "How many books can a member borrow at a time?", answer_any: ["4", "four"]}
+  - {id: 14, doc: library_rules.txt,   in_doc: true,  question: "Who is the head librarian?", answer_any: ["kavitha"]}
+  - {id: 15, doc: library_rules.txt,   in_doc: true,  question: "How many seats are in the reading room?", answer_any: ["40", "forty"]}
+  - {id: 16, doc: library_rules.txt,   in_doc: true,  question: "When is the children's story hour?", answer_any: ["saturday"]}
+  - {id: 17, doc: cycling_club.txt,    in_doc: false, question: "What is the cycling club's Instagram handle?", answer_any: []}
+  - {id: 18, doc: library_rules.txt,   in_doc: false, question: "Does the library have a cafe?", answer_any: []}
+  - {id: 19, doc: friday_notes.pdf,    in_doc: false, question: "What is Friday's wake word?", answer_any: []}
+  - {id: 20, doc: cycling_club.txt,    in_doc: false, question: "Who is the treasurer of the cycling club?", answer_any: []}

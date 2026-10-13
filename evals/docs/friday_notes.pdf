@@ -1,0 +1,72 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+5 0 obj
+<< /Length 1949 >>
+stream
+BT /F1 11 Tf 14 TL 50 740 Td
+(Friday: Project Notes) '
+() '
+(Friday is a voice-first personal assistant built by Aditya in Bengaluru. It runs on) '
+(his own laptop and is controlled by holding the Right Ctrl key while speaking, which) '
+(is called push-to-talk.) '
+() '
+(For speech to text, Friday uses faster-whisper with the base.en model. For text to) '
+(speech, it uses Piper with the en_US-amy-medium voice. Piper speaks the reply one) '
+(sentence at a time.) '
+() '
+(The main language model is Groq running gpt-oss-20b. If Groq fails, Friday falls back) '
+(to Gemini. Both are called through one file named llm.py.) '
+() '
+(Friday uses LangGraph to run each command. The graph goes from the router to a safety) '
+(check, then to either a skill or the language model, and finally to the reply.) '
+() '
+(All data is stored in SQLite. This includes chat history, reminders, lists, traces) '
+(and documents.) '
+() '
+(Reminders are scheduled with APScheduler and saved in SQLite, so they survive a) '
+(restart. Friday cannot yet repeat reminders, list them or cancel them.) '
+() '
+(The music skill uses the Spotify Web API. It plays only on the device named ADI7 and) '
+(never falls back to another device. Friday cannot yet play playlists or albums by) '
+(name, and it cannot set the volume by spoken numbers like volume fifty.) '
+() '
+(The chat skill remembers the last six turns of conversation. A turn is one message) '
+(from the user plus Friday's reply.) '
+() '
+(Math is handled by a safe parser that never uses eval. Lists and notes are stored in) '
+(a table called list_items.) '
+() '
+(The catch skill is always registered last. If a command sounds like a list, reminder) '
+(or timer command but is garbled, it asks the user to say it again instead of letting) '
+(the language model pretend it saved something.) '
+() '
+(Secrets such as API keys live only in the .env file and the .secrets folder, and both) '
+(are ignored by git.) '
+() '
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000185 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2312
+%%EOF
