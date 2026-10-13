@@ -66,6 +66,9 @@ def test_can_handle_document_phrases():
         "read me the document",
         "can you read the document to me please",
         "keep reading",
+        "what does a document say about piper",
+        "according to that document what is the deadline",
+        "what does the documents say about the weather",
     ):
         assert skill.can_handle(sentence), sentence
 

@@ -24,7 +24,7 @@ from friday.skills.base import Skill
 READ_WORDS = 100  # about 40 seconds of speech per part
 READ_EXTRA = 60  # may run this many words over to finish a sentence
 
-_DOC = r"(?:the|this|my) (?:document|doc|pdf|paper)"
+_DOC = r"(?:the|this|my|a|that|our) (?:documents?|docs?|pdfs?|papers?)"
 _OPENING = r"(?:(?:can|could) you |please |hey friday |friday )?"
 
 _ASK = re.compile(
