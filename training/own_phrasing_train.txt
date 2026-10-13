@@ -1,0 +1,73 @@
+math_time|whats todays date ?
+math_time|what day is it tom ?
+math_time|how many days are left until the 15th of this month?
+math_time|is it morning or evening
+math_time|what month are we in now ?
+other|whats the time in japan now
+math_time|time ?
+math_time|whats 15 into 5
+math_time|split 6500 among 3 people
+math_time|whats 9800 after 20 percent discount
+math_time|whats twelve times ten
+other|how many commas are there in 2400
+math_time|5 percent of 1000
+math_time|whats 30 degree celsius in fahrenheit
+math_time|what is 100cm in inches
+math_time|convert 10 liters to millilitres or gallons
+other|convert 50 dollars to rupees
+timers_reminders|remind me to drink water in 20 minutes
+timers_reminders|remind me to call my boss at 8 in the morning
+timers_reminders|remind me to take my wallet when i leave
+timers_reminders|remind me to check the market every morning
+timers_reminders|remind me on 4th of this month to call a friend
+timers_reminders|ping me at 5pm to send something
+timers_reminders|set an alarm for 5am
+timers_reminders|please wake me up at 8 in the morning
+timers_reminders|set a timer for 10 minutes
+timers_reminders|start a 3 minute timer
+timers_reminders|tell me the reminders ive told you or set
+timers_reminders|remove this reminder or alarm
+timers_reminders|add a reminder for tomorrow
+lists_notes|add milk to my shopping list
+lists_notes|add eggs , bread and jam to the list
+lists_notes|remove eggs from shopping list
+lists_notes|whats there on my shopping list
+lists_notes|create a new party list
+lists_notes|add drinks to my party list
+lists_notes|note down this rate for me
+lists_notes|empty the whole party list
+music|play counting stars by onerepublic
+music|play some rock music
+music|pause the song
+music|play the next song
+music|please play the previous song
+music|increase the volume
+music|decrease the volume
+music|set volume to 60 percent
+music|mute the song
+music|skip or play louder
+other|what song is playing right now ?
+other|check for nikhil kamath new podcast episode
+doc_qa|according to the document , what is the main topic
+doc_qa|whats the document about
+doc_qa|summarize the document
+doc_qa|how many pages is the document, whats the name of the document, when was this document sent ?
+doc_qa|read this document to me
+doc_qa|read only the first paragraph
+doc_qa|where is the word ai mentioned in the document
+doc_qa|find this word planes in this document
+doc_qa|what does this point mean ?
+other|read the latest news to me
+other|hello friday
+other|how you doing friday
+other|friday tell me a joke
+other|tell me a fun fact friday
+other|whats the weather like today
+other|whats the current score of rcb
+other|who is the president of india
+other|how to focus while studying
+other|how do i make brownies , or whats the recipe for making a brownie
+other|whats the price of one mrf stock currently
+other|why is my phone alarm so loud
+other|what does remind mean
+other|who won the 2010 fifa world cup

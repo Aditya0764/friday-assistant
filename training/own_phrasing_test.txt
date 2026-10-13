@@ -1,0 +1,60 @@
+math_time|friday whats the time now ?
+math_time|what day is it today ?
+math_time|what day does 20th of this month fall on
+math_time|how long until 8 today ?
+math_time|what year is it currently?
+math_time|date today ?
+math_time|whats 10 percent of 5000
+math_time|add 10 plus 20
+math_time|minus 20 from 40
+math_time|divide 100 by 5
+math_time|whats the square root of 21
+math_time|whats 20 percent more than 500
+math_time|convert 5 kilometers into miles or 5 miles to kilometers
+math_time|convert 5kg to pounds
+math_time|convert 5 hours into minutes or 4 minutes to seconds
+math_time|what is 100 meters in feet
+math_time|10km in miles
+math_time|how many grams are there in a kilo
+timers_reminders|remind me to apply for jobs at 6 in the evening
+timers_reminders|remind me to call mom tomorrow
+timers_reminders|remind me to wash my face before i go to sleep at 10
+timers_reminders|remind me to attend a meeting
+timers_reminders|remind me every tuesday every week to wash my car
+timers_reminders|remind me to finish my work before the deadline
+timers_reminders|remind me to stretch in 2 minutes
+timers_reminders|remind me to pay the bill
+timers_reminders|remind me to go to the gym
+timers_reminders|remind me at 6
+timers_reminders|dont let me forget something tomorrow
+timers_reminders|repeat this 6 am alarm on weekdays
+lists_notes|add message boss to my to do list
+lists_notes|read out my whole to do list for today
+lists_notes|hey friday read my notes
+lists_notes|check if drinks is there in my list
+lists_notes|mark done for eggs
+lists_notes|how many items are there in the list
+lists_notes|add milk
+music|play starboy
+music|play coldplays music
+music|play a playlist for working out
+music|i want to hear you play blinding lights by the weekend
+music|resume the song
+other|shuffle this playlist or repeat the same song 3 times
+doc_qa|whats the topic of the document
+doc_qa|give me an answer from the pdf itself
+doc_qa|check if it mentions anything about submarines
+doc_qa|hey friday read the whole document
+doc_qa|read the next part
+doc_qa|is this document for dsa subject
+doc_qa|what does it say about cricket
+other|hows the weather tomorrow
+other|whats the meaning of this word resemblance
+other|whats the latest news on ai
+other|whats the meaning of maximum
+other|help me write an email to my boss
+other|tell me the directions to my house
+other|thanks friday
+other|im bored bro
+other|who sang despacito
+other|give me a list of cricketers
