@@ -48,6 +48,6 @@ def test_skills_never_reach_the_llm_or_its_prompt(tmp_path):
 
 def test_the_prompt_forbids_fake_actions_and_is_short():
     text = FRIDAY_PROMPT.lower()
-    for phrase in ("never say or imply", "reminders", "music", "say it again"):
+    for phrase in ("never say or imply", "reminders", "music", "volume", "say it again"):
         assert phrase in text
     assert len(FRIDAY_PROMPT) < 1200
