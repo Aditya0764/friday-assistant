@@ -19,6 +19,9 @@ _POLITE_START = re.compile(r"^(?:(?:please|can you|could you|would you|will you)
 _POLITE_END = re.compile(r" please$")
 
 _MEDIA = r"(?:music|song|track|spotify|playback)"
+_VW = r"(?:the )?(?:music )?volume"  # 'volume', 'the volume', 'the music volume'
+_MORE = {"up", "increase", "raise", "louder"}  # words meaning 'turn it up'
+
 _PAUSE = re.compile(rf"^pause(?: (?:the )?{_MEDIA})?$|^stop (?:the )?{_MEDIA}$")
 _RESUME = re.compile(
     rf"^(?:resume|unpause|continue)(?: (?:the )?(?:{_MEDIA}|playing))?$|^play (?:some |the )?music$"
@@ -30,11 +33,23 @@ _NEXT = re.compile(
 _PREVIOUS = re.compile(
     r"^(?:previous|last|play the previous|play the last) (?:song|track)$|^go back(?: a)?(?: (?:song|track))?$"
 )
-_VOLUME_SET = re.compile(r"^(?:set |put |turn )?(?:the )?volume (?:to |at )?(\d{1,3})(?: ?(?:percent|%))?$")
-_VOLUME_DIR = re.compile(
-    r"^(?:turn |put |bring )?(?:the )?volume (up|down)$|^turn (?:the music |it )(up|down)$"
+_VOLUME_SET = re.compile(
+    rf"^(?:(?:set|put|turn|change|make|increase|raise|decrease|lower|reduce|bring) )?{_VW} "
+    r"(?:(?:of the|of|to|at|up to|down to) )?(\d{1,3})(?: ?(?:percent|%))?$"
 )
-_LOUDER = re.compile(r"^louder$|^quieter$")
+_VOLUME_FULL = re.compile(
+    rf"^(?:(?:set|turn|put) )?{_VW} (?:(?:to|at) )?(?:full|max|maximum)$|^(?:full|max|maximum) volume$"
+)
+_MUTE = re.compile(
+    rf"^mute(?: (?:the )?(?:music|song|spotify|volume))?$|^(?:(?:set|turn) )?{_VW} (?:(?:to|at) )?(?:zero|off)$"
+)
+_VOLUME_DIR = re.compile(
+    rf"^(?:(?:turn|put|bring|make|set) )?{_VW} (up|down)$"
+    rf"|^(?:turn|put|bring) (up|down) {_VW}$"
+    r"|^(?:turn|put|bring) (?:the music |it |the sound )?(up|down)$"
+    rf"|^(increase|raise|decrease|lower|reduce) {_VW}$"
+    r"|^(?:make it |a bit |a little |a little bit )?(louder|quieter)$"
+)
 _NOW = re.compile(
     r"^what(?:'s| is) (?:this song|this track|playing|currently playing|the song playing|playing right now)$"
     r"|^what song is (?:this|playing)(?: right now)?$"
@@ -65,17 +80,18 @@ def parse_command(clean: str) -> Command | None:
         return Command("previous")
     if _NOW.match(text):
         return Command("now")
+
     match = _VOLUME_SET.match(text)
     if match:
         return Command("volume_set", value=int(match.group(1)))
+    if _VOLUME_FULL.match(text):
+        return Command("volume_set", value=100)
+    if _MUTE.match(text):
+        return Command("volume_set", value=0)
     match = _VOLUME_DIR.match(text)
     if match:
-        direction = match.group(1) or match.group(2)
-        return Command("volume_change", value=1 if direction == "up" else -1)
-    if text == "louder":
-        return Command("volume_change", value=1)
-    if text == "quieter":
-        return Command("volume_change", value=-1)
+        word = next(group for group in match.groups() if group)
+        return Command("volume_change", value=1 if word in _MORE else -1)
 
     match = _PLAY.match(text)
     if match:

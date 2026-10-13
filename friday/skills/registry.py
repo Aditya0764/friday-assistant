@@ -29,7 +29,7 @@ def build_registry(scheduler=None, db_path=None, player=None) -> SkillRegistry:
         registry.register(ReminderSkill(scheduler))
     if player is not None:
         registry.register(MusicSkill(player))
-    registry.register(CatchSkill(reminders=scheduler is not None))  # always last
+    registry.register(CatchSkill(reminders=scheduler is not None, music=player is not None))  # always last
     return registry
 
 
