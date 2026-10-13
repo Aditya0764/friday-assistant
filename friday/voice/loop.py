@@ -6,6 +6,9 @@ One spoken command = one run_id: record, stt, router, safety/skill or llm, reply
 
 Reminders: a background scheduler speaks them when they are due. A lock makes sure a
 reminder never talks over a reply (it waits until the reply is finished).
+
+Music: if Spotify is set up in .env, the music skill is switched on. It plays only on
+the device named in SPOTIFY_DEVICE_NAME.
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ from friday.graph import build_graph
 from friday.prompt import FRIDAY_PROMPT
 from friday.scheduler import ReminderScheduler
 from friday.skills.registry import build_registry
+from friday.spotify_client import SpotifyPlayer
 from friday.trace import Tracer
 from friday.voice.audio import DEFAULT_KEY, record_while_held
 from friday.voice.stt import get_stt
@@ -102,10 +106,12 @@ def main() -> None:
 
     scheduler = ReminderScheduler(say)
     restored = scheduler.start()
-    registry = build_registry(scheduler)
+    player = SpotifyPlayer.from_env()  # None when Spotify is not set up in .env
+    registry = build_registry(scheduler, player=player)
     app = build_graph(conn, registry, system_prompt=FRIDAY_PROMPT)
     print(f"Skills: {', '.join(registry.names())}")
     print(f"Reminders waiting: {restored}")
+    print("Music: on" if player else "Music: off (Spotify not set up in .env)")
     print(f"Ready. Hold [{DEFAULT_KEY}], speak, release. Ctrl+C to quit.")
 
     try:
