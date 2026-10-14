@@ -85,3 +85,22 @@ lists_notes|delete the cricket list
 lists_notes|can you read my last note
 lists_notes|put rice
 lists_notes|add 3 kilos of meat
+music|can you play starboy
+music|put on some songs by the weekend
+music|search party songs and play the whole playlist
+music|play a song from the 90's by a band
+music|stop the music
+music|start the song from where you paused
+music|volume 50
+music|lower the volume or slightly increase the volume
+music|pause
+music|unpause the music
+music|play some music for studying
+timers_reminders|make me wake up at 6 am
+timers_reminders|countdown from 2 minutes
+timers_reminders|how much time is left on the timer
+other|is the reminders list updated with new information
+other|whats a linked list
+other|when did india get its independence
+other|tell me about that 2011 cricket world cup final which happened in india
+other|how do i cook a high protein veg meal

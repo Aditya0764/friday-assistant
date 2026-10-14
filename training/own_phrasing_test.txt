@@ -72,3 +72,19 @@ lists_notes|friday read out my to do list for today
 lists_notes|note this idea down
 lists_notes|check if eggs is there in the gym list
 lists_notes|tell me all my lists
+music|go to the next one
+music|go back to the previous song
+music|play anything bro
+music|play the song that has a lyric like fell in love , not knowing what it was ,that song
+timers_reminders|put a timer for 10 minutes until the rice cooks
+timers_reminders|notify me at 5pm for a meeting with my boss
+timers_reminders|set a reminder for a meeting at 7pm
+timers_reminders|cancel the morning alarm at 7
+timers_reminders|snooze the alarm , delay the alarm by an hour
+timers_reminders|tell me at 7 am this thursday for a call
+timers_reminders|set a reminder every 15th of the month to pay the wifi bill
+other|who sang this song ?
+other|hows the weather in hyderabad
+other|translate this word bonjour to english
+other|how are you doing today
+other|send a small message to my friend to get the ball while coming home

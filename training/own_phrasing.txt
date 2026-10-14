@@ -160,3 +160,38 @@ lists_notes|check if eggs is there in the gym list
 lists_notes|tell me all my lists
 lists_notes|put rice
 lists_notes|add 3 kilos of meat
+music|can you play starboy
+music|put on some songs by the weekend
+music|search party songs and play the whole playlist
+music|play a song from the 90's by a band
+music|stop the music
+music|start the song from where you paused
+music|go to the next one
+music|go back to the previous song
+music|volume 50
+music|lower the volume or slightly increase the volume
+music|pause
+music|unpause the music
+music|play some music for studying
+music|play anything bro
+music|play the song that has a lyric like fell in love , not knowing what it was ,that song
+timers_reminders|make me wake up at 6 am
+timers_reminders|countdown from 2 minutes
+timers_reminders|put a timer for 10 minutes until the rice cooks
+timers_reminders|notify me at 5pm for a meeting with my boss
+timers_reminders|set a reminder for a meeting at 7pm
+timers_reminders|how much time is left on the timer
+timers_reminders|cancel the morning alarm at 7
+timers_reminders|snooze the alarm , delay the alarm by an hour
+timers_reminders|tell me at 7 am this thursday for a call
+timers_reminders|set a reminder every 15th of the month to pay the wifi bill
+other|who sang this song ?
+other|is the reminders list updated with new information
+other|whats a linked list
+other|when did india get its independence
+other|hows the weather in hyderabad
+other|tell me about that 2011 cricket world cup final which happened in india
+other|how do i cook a high protein veg meal
+other|translate this word bonjour to english
+other|how are you doing today
+other|send a small message to my friend to get the ball while coming home
