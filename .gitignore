@@ -227,4 +227,6 @@ models/
 *.onnx
 credentials.json
 token.json
+client_secret*.jsondata_wake/
 client_secret*.json
+data_wake/
