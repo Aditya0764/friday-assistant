@@ -4,12 +4,14 @@ Saves 16 kHz mono 16-bit WAV files under data_wake/ (git-ignored, never commit).
 
   python training/record_wakeword.py test
   python training/record_wakeword.py pos --session normal --count 20
+  python training/record_wakeword.py pos --session far --count 20 --auto
   python training/record_wakeword.py miss --session s1 --count 20
   python training/record_wakeword.py neg --session talk --minutes 5
 
 pos  = you say the wake phrase once per clip (positives).
 miss = you say near-miss phrases (negatives that sound close).
 neg  = a long recording of normal sound where the phrase is NOT said.
+--auto = no Enter key: a beep cues each clip (good for recording from far away).
 """
 
 import argparse
@@ -49,10 +51,13 @@ def save_wav(path, audio):
         f.writeframes(audio.tobytes())
 
 
-def record(seconds):
-    audio = sd.rec(int(seconds * RATE), samplerate=RATE, channels=1, dtype="int16")
-    sd.wait()
-    return audio[:, 0]
+def record(stream, seconds):
+    """Cut a clip out of the always-open mic stream (no device warm-up delay)."""
+    waiting = stream.read_available
+    if waiting:
+        stream.read(waiting)  # drop audio from before the cue
+    audio, _ = stream.read(int(seconds * RATE))
+    return audio[:, 0].copy()
 
 
 def peak(audio):
@@ -68,40 +73,60 @@ def level_note(level):
 
 
 def next_index(folder, prefix):
+    """Highest existing clip number, so new clips never overwrite old ones."""
     if not folder.exists():
         return 0
-    return len(list(folder.glob(f"{prefix}_*.wav")))
+    numbers = [int(p.stem.rsplit("_", 1)[1]) for p in folder.glob(f"{prefix}_*.wav")]
+    return max(numbers, default=0)
 
 
-def record_clips(folder, prompts, count):
+def beep():
+    try:
+        import winsound
+
+        winsound.Beep(1000, 150)
+    except ImportError:
+        print("\a", end="", flush=True)
+
+
+def record_clips(stream, folder, prompts, count, auto):
     start = next_index(folder, "clip")
+    if auto:
+        print("Auto mode: say the phrase right after each beep. Ctrl+C stops.")
     for n in range(count):
         prompt = prompts[n % len(prompts)]
-        input(f'[{n + 1}/{count}] Press Enter, then say: "{prompt}" ... ')
-        time.sleep(0.3)
-        audio = record(CLIP_SECONDS)
+        label = f'[{n + 1}/{count}] say: "{prompt}"'
+        if auto:
+            print(f"{label} ... get ready")
+            time.sleep(1.5)
+            beep()
+            time.sleep(0.2)
+        else:
+            input(f"{label} (press Enter, then speak) ... ")
+            time.sleep(0.3)
+        audio = record(stream, CLIP_SECONDS)
         level = peak(audio)
         save_wav(folder / f"clip_{start + n + 1:03d}.wav", audio)
         print(f"    saved, peak {level:.2f}: {level_note(level)}")
 
 
-def record_negatives(folder, minutes):
+def record_negatives(stream, folder, minutes):
     start = next_index(folder, "part")
     parts = max(1, round(minutes / CHUNK_MINUTES))
     print(f"Recording {parts * CHUNK_MINUTES} minutes in {parts} part(s).")
     print("Do NOT say the wake phrase. Ctrl+C stops (finished parts are kept).")
     for n in range(parts):
         print(f"  part {n + 1}/{parts} recording...")
-        audio = record(CHUNK_MINUTES * 60)
+        audio = record(stream, CHUNK_MINUTES * 60)
         level = peak(audio)
         save_wav(folder / f"part_{start + n + 1:03d}.wav", audio)
         print(f"  saved, peak {level:.2f}: {level_note(level)}")
 
 
-def mic_test():
+def mic_test(stream):
     print("Input device:", sd.query_devices(kind="input")["name"])
     print("Say something for 3 seconds...")
-    audio = record(3)
+    audio = record(stream, 3)
     level = peak(audio)
     print(f"peak {level:.2f}: {level_note(level)}")
 
@@ -112,16 +137,22 @@ def main():
     parser.add_argument("--session", default="s1")
     parser.add_argument("--count", type=int, default=20)
     parser.add_argument("--minutes", type=int, default=5)
+    parser.add_argument("--auto", action="store_true")
     args = parser.parse_args()
     try:
-        if args.mode == "test":
-            mic_test()
-        elif args.mode == "pos":
-            record_clips(OUT / "pos" / args.session, [PHRASE], args.count)
-        elif args.mode == "miss":
-            record_clips(OUT / "neg" / f"miss_{args.session}", NEAR_MISSES, args.count)
-        else:
-            record_negatives(OUT / "neg" / args.session, args.minutes)
+        with sd.InputStream(samplerate=RATE, channels=1, dtype="int16") as stream:
+            time.sleep(1.0)  # let the mic start up before the first cue
+            if args.mode == "test":
+                mic_test(stream)
+            elif args.mode == "pos":
+                folder = OUT / "pos" / args.session
+                record_clips(stream, folder, [PHRASE], args.count, args.auto)
+            elif args.mode == "miss":
+                folder = OUT / "neg" / f"miss_{args.session}"
+                record_clips(stream, folder, NEAR_MISSES, args.count, args.auto)
+            else:
+                folder = OUT / "neg" / args.session
+                record_negatives(stream, folder, args.minutes)
     except KeyboardInterrupt:
         print("\nStopped. Files saved so far are kept.")
         sys.exit(0)
