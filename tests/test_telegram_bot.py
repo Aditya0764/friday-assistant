@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -11,18 +12,30 @@ from friday.skills.registry import build_registry
 
 OWNER = "111"
 STRANGER = "999"
-TOKEN = "123:SECRETTOKEN"
+SECRET = "SECRETTOKEN"
+TOKEN = f"123:{SECRET}"
 
 
 class FakeClient:
-    def __init__(self, fail: bool = False) -> None:
+    def __init__(self, fail: bool = False, download_error: bool = False) -> None:
         self.sent: list[tuple[str, str]] = []
+        self.downloaded: list[str] = []
         self.fail = fail
+        self.download_error = download_error
 
     def send_message(self, chat_id, text):
         if self.fail:
             raise tb.TelegramError("sendMessage: Telegram answered HTTP 500")
         self.sent.append((str(chat_id), text))
+
+    def get_file_path(self, file_id):
+        return f"voice/{file_id}.oga"
+
+    def download_file(self, file_path):
+        if self.download_error:
+            raise tb.TelegramError("download: Telegram answered HTTP 500")
+        self.downloaded.append(file_path)
+        return b"fake-audio"
 
 
 class FakeApp:
@@ -36,6 +49,21 @@ class FakeApp:
         return {"reply": self.reply, "via": "llm"}
 
 
+class Transcriber:
+    """Stands in for Whisper: records what file it was given and returns fixed text."""
+
+    def __init__(self, text: str = "echo hello friday", error: Exception | None = None) -> None:
+        self.text = text
+        self.error = error
+        self.calls: list[tuple[str, bytes]] = []
+
+    def __call__(self, path):
+        if self.error:
+            raise self.error
+        self.calls.append((Path(path).name, Path(path).read_bytes()))
+        return self.text
+
+
 def fake_llm(messages):
     return SimpleNamespace(text="stub reply", provider="stub", model="stub", ms=0)
 
@@ -45,6 +73,10 @@ def update(update_id, chat_id, text=None, **extra):
     if text is not None:
         message["text"] = text
     return {"update_id": update_id, "message": message}
+
+
+def voice_update(update_id, chat_id, duration=3):
+    return update(update_id, chat_id, voice={"file_id": "abc", "duration": duration})
 
 
 def make_client(handler):
@@ -82,9 +114,9 @@ def test_messages_from_another_chat_are_ignored_completely(parts):
     assert conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0] == 0
 
 
-def test_non_text_message_from_the_owner_gets_the_text_only_reply(parts):
+def test_a_photo_gets_the_text_only_reply(parts):
     conn, app, client = parts
-    tb.handle_update(update(1, OWNER, voice={"file_id": "x"}), app, conn, OWNER, client)
+    tb.handle_update(update(1, OWNER, photo=[{"file_id": "x"}]), app, conn, OWNER, client)
     assert client.sent == [(OWNER, tb.TEXT_ONLY)]
 
 
@@ -121,13 +153,82 @@ def test_a_failed_send_does_not_stop_the_batch(parts):
     assert tb.process_updates(updates, None, app, conn, OWNER, client) == 7
 
 
+def test_voice_note_is_transcribed_and_answered(parts):
+    conn, app, client = parts
+    heard = Transcriber()
+    tb.handle_update(voice_update(1, OWNER), app, conn, OWNER, client, heard)
+    assert client.sent == [(OWNER, 'You said: "echo hello friday"\n\nhello friday')]
+    assert heard.calls == [("voice.oga", b"fake-audio")]
+
+
+def test_voice_turn_is_saved_as_telegram_voice_without_the_you_said_line(parts):
+    conn, app, client = parts
+    tb.handle_update(voice_update(1, OWNER), app, conn, OWNER, client, Transcriber())
+    rows = conn.execute("SELECT channel, role, content FROM messages ORDER BY id").fetchall()
+    assert [tuple(r) for r in rows] == [
+        ("telegram_voice", "user", "echo hello friday"),
+        ("telegram_voice", "assistant", "hello friday"),
+    ]
+
+
+def test_voice_note_that_is_too_long_is_refused_before_download(parts):
+    conn, app, client = parts
+    heard = Transcriber()
+    update_ = voice_update(1, OWNER, duration=tb.MAX_VOICE_SECONDS + 1)
+    tb.handle_update(update_, app, conn, OWNER, client, heard)
+    assert client.sent == [(OWNER, tb.VOICE_TOO_LONG)]
+    assert client.downloaded == []
+    assert heard.calls == []
+
+
+def test_voice_note_with_no_speech_gets_a_message_and_saves_nothing(parts):
+    conn, app, client = parts
+    tb.handle_update(voice_update(1, OWNER), app, conn, OWNER, client, Transcriber(text="  "))
+    assert client.sent == [(OWNER, tb.NO_SPEECH)]
+    assert conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0] == 0
+
+
+def test_voice_note_from_another_chat_is_ignored_before_download(parts):
+    conn, app, client = parts
+    tb.handle_update(voice_update(1, STRANGER), app, conn, OWNER, client, Transcriber())
+    assert client.sent == []
+    assert client.downloaded == []
+
+
+def test_voice_download_failure_gives_a_safe_reply(parts):
+    conn, app, _ = parts
+    client = FakeClient(download_error=True)
+    tb.handle_update(voice_update(1, OWNER), app, conn, OWNER, client, Transcriber())
+    assert client.sent == [(OWNER, tb.OOPS)]
+
+
+def test_transcription_crash_gives_a_safe_reply_without_details(parts):
+    conn, app, client = parts
+    broken = Transcriber(error=RuntimeError("boom: internal details"))
+    tb.handle_update(voice_update(1, OWNER), app, conn, OWNER, client, broken)
+    assert client.sent == [(OWNER, tb.OOPS)]
+
+
+def test_voice_note_without_a_transcriber_gets_the_text_only_reply(parts):
+    conn, app, client = parts
+    tb.handle_update(voice_update(1, OWNER), app, conn, OWNER, client)
+    assert client.sent == [(OWNER, tb.TEXT_ONLY)]
+
+
+def test_process_updates_passes_the_transcriber_on(parts):
+    conn, app, client = parts
+    offset = tb.process_updates([voice_update(8, OWNER)], None, app, conn, OWNER, client, Transcriber())
+    assert offset == 9
+    assert client.sent[0][1].endswith("hello friday")
+
+
 def test_network_error_does_not_leak_the_token():
     def handler(request):
         raise httpx.ConnectError("no route", request=request)
 
     with pytest.raises(tb.TelegramError) as info:
         make_client(handler).send_message("1", "hi")
-    assert TOKEN.split(":")[1] not in str(info.value)
+    assert SECRET not in str(info.value)
     assert info.value.__suppress_context__
 
 
@@ -138,7 +239,7 @@ def test_http_error_reports_the_status_but_not_the_token():
     with pytest.raises(tb.TelegramError) as info:
         make_client(handler).get_updates(None, timeout=0)
     assert "401" in str(info.value)
-    assert TOKEN.split(":")[1] not in str(info.value)
+    assert SECRET not in str(info.value)
 
 
 def test_get_updates_returns_the_result_and_sends_the_offset():
@@ -150,3 +251,41 @@ def test_get_updates_returns_the_result_and_sends_the_offset():
 
     assert make_client(handler).get_updates(3, timeout=0) == [{"update_id": 3}]
     assert seen["offset"] == 3
+
+
+def test_get_file_path_reads_the_result():
+    def handler(request):
+        return httpx.Response(200, json={"ok": True, "result": {"file_path": "voice/a.oga"}})
+
+    assert make_client(handler).get_file_path("abc") == "voice/a.oga"
+
+
+def test_download_returns_the_bytes_from_the_file_endpoint():
+    seen = {}
+
+    def handler(request):
+        seen["path"] = request.url.path
+        return httpx.Response(200, content=b"abc")
+
+    assert make_client(handler).download_file("voice/a.oga") == b"abc"
+    assert seen["path"] == f"/file/bot{TOKEN}/voice/a.oga"
+
+
+def test_download_network_error_does_not_leak_the_token():
+    def handler(request):
+        raise httpx.ConnectError("no route", request=request)
+
+    with pytest.raises(tb.TelegramError) as info:
+        make_client(handler).download_file("voice/a.oga")
+    assert SECRET not in str(info.value)
+    assert info.value.__suppress_context__
+
+
+def test_download_http_error_reports_the_status_only():
+    def handler(request):
+        return httpx.Response(404)
+
+    with pytest.raises(tb.TelegramError) as info:
+        make_client(handler).download_file("voice/a.oga")
+    assert "404" in str(info.value)
+    assert SECRET not in str(info.value)
