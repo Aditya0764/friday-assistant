@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import DocsPanel from './DocsPanel.jsx'
+import TracePanel from './TracePanel.jsx'
 import { postJson } from './api.js'
 
 const MAX_CHARS = 2000
@@ -29,6 +30,7 @@ function Sources({ sources }) {
 }
 
 export default function App() {
+  const [view, setView] = useState('chat') // 'chat' or 'trace'
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -37,10 +39,11 @@ export default function App() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, busy])
+  }, [messages, busy, view])
 
   async function ask(message) {
     if (busy) return
+    setView('chat')
     setBusy(true)
     setMessages((m) => [...m, { role: 'user', text: message }])
     const controller = new AbortController()
@@ -85,47 +88,71 @@ export default function App() {
 
       <div className="app">
         <header className="app-header">
-          <h1>Friday</h1>
-          <p>Typed chat. Same brain as the voice loop and Telegram.</p>
+          <div>
+            <h1>Friday</h1>
+            <p>Same brain as the voice loop and Telegram.</p>
+          </div>
+          <nav className="tabs">
+            <button
+              type="button"
+              className={view === 'chat' ? 'tab active' : 'tab'}
+              onClick={() => setView('chat')}
+            >
+              Chat
+            </button>
+            <button
+              type="button"
+              className={view === 'trace' ? 'tab active' : 'tab'}
+              onClick={() => setView('trace')}
+            >
+              Trace
+            </button>
+          </nav>
         </header>
 
-        <main className="messages">
-          {messages.length === 0 && (
-            <div className="empty">Try: what time is it, or: what&apos;s 18% of 2400</div>
-          )}
-          {messages.map((m, i) => (
-            <div key={i} className={`row ${m.role}${m.error ? ' error' : ''}`}>
-              <div className="bubble">{m.text}</div>
-              {m.meta && <div className="meta">{m.meta}</div>}
-              {m.sources?.length > 0 && <Sources sources={m.sources} />}
-            </div>
-          ))}
-          {busy && (
-            <div className="row friday">
-              <div className="bubble">...</div>
-            </div>
-          )}
-          <div ref={endRef} />
-        </main>
+        {view === 'trace' ? (
+          <TracePanel />
+        ) : (
+          <>
+            <main className="messages">
+              {messages.length === 0 && (
+                <div className="empty">Try: what time is it, or: what&apos;s 18% of 2400</div>
+              )}
+              {messages.map((m, i) => (
+                <div key={i} className={`row ${m.role}${m.error ? ' error' : ''}`}>
+                  <div className="bubble">{m.text}</div>
+                  {m.meta && <div className="meta">{m.meta}</div>}
+                  {m.sources?.length > 0 && <Sources sources={m.sources} />}
+                </div>
+              ))}
+              {busy && (
+                <div className="row friday">
+                  <div className="bubble">...</div>
+                </div>
+              )}
+              <div ref={endRef} />
+            </main>
 
-        <form className="composer" onSubmit={submit}>
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            maxLength={MAX_CHARS}
-            placeholder="Type a message"
-            autoFocus
-          />
-          {busy ? (
-            <button type="button" className="stop" onClick={() => abortRef.current?.abort()}>
-              Stop
-            </button>
-          ) : (
-            <button type="submit" disabled={!text.trim()}>
-              Send
-            </button>
-          )}
-        </form>
+            <form className="composer" onSubmit={submit}>
+              <input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                maxLength={MAX_CHARS}
+                placeholder="Type a message"
+                autoFocus
+              />
+              {busy ? (
+                <button type="button" className="stop" onClick={() => abortRef.current?.abort()}>
+                  Stop
+                </button>
+              ) : (
+                <button type="submit" disabled={!text.trim()}>
+                  Send
+                </button>
+              )}
+            </form>
+          </>
+        )}
       </div>
     </div>
   )

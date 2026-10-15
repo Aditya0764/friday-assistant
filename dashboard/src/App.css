@@ -347,3 +347,116 @@ button {
     height: 80vh;
   }
 }
+/* ---------- tabs and trace page ---------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.tab {
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.tab.active {
+  color: var(--accent-text);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.trace {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trace-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.trace-bar .live {
+  color: var(--ok);
+}
+
+.trace-bar .waiting {
+  color: var(--bad);
+}
+
+.trace-bar button {
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.trace-bar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.run {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.run-head {
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.step + .step {
+  border-top: 1px solid var(--line);
+}
+
+.step {
+  padding: 6px 0;
+}
+
+.step-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.step-name {
+  font-weight: 600;
+}
+
+.step-ms {
+  color: var(--muted);
+}
+
+.step-io {
+  max-height: 90px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
