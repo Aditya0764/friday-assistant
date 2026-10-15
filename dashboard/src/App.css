@@ -460,3 +460,48 @@ button {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* ---------- voice bar and mic ---------- */
+
+.voice-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 30px;
+  padding: 6px 20px 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.speak-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.rec-note {
+  color: var(--bad);
+}
+
+.voice-bar .mini {
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.composer button.mic {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+.composer button.mic.recording {
+  color: #ffffff;
+  background: var(--bad);
+  border-color: var(--bad);
+}
