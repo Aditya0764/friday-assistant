@@ -19,6 +19,7 @@ class Settings:
     groq_api_key: str = field(repr=False)
     gemini_api_key: str = field(default="", repr=False)
     telegram_bot_token: str = field(default="", repr=False)
+    telegram_chat_id: str = ""  # the only chat the Telegram bot answers
     db_path: Path = ROOT / "data" / "friday.db"
 
 
@@ -30,4 +31,5 @@ def get_settings() -> Settings:
         groq_api_key=groq_key,
         gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
         telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", "").strip(),
+        telegram_chat_id=os.getenv("TELEGRAM_CHAT_ID", "").strip(),
     )

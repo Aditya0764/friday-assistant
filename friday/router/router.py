@@ -32,8 +32,9 @@ def normalize(text: str) -> str:
 
     Kept: apostrophes, % + - * / ^ ( ), and dots inside numbers (3.5).
     Thousands commas inside numbers are removed (2,400 -> 2400).
+    Curly apostrophes (what phones type: What’s) become plain ones first.
     """
-    text = text.lower()
+    text = text.lower().replace("\u2019", "'").replace("\u2018", "'")
     text = re.sub(r"(?<=\d),(?=\d{3}\b)", "", text)
     text = re.sub(r"[^\w\s'%+\-*/^().]", " ", text)
     text = re.sub(r"(?<!\d)\.|\.(?!\d)", " ", text)
