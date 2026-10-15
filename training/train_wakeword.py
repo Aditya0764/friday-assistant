@@ -315,11 +315,23 @@ def real_rirs(p):
 
     if len(list(p["rir"].glob("*.wav"))) >= 200:
         return
+    # Kaggle shares IPs, so Hugging Face rate-limits (429): few threads + retries.
+    os.environ["HF_DATASETS_MULTITHREADING_MAX_WORKERS"] = "2"
     import datasets
 
-    ds = datasets.load_dataset(
-        "davidscripka/MIT_environmental_impulse_responses", split="train"
-    )
+    ds = None
+    for attempt in range(1, 9):
+        try:
+            ds = datasets.load_dataset(
+                "davidscripka/MIT_environmental_impulse_responses", split="train"
+            )
+            break
+        except Exception as err:  # noqa: BLE001 - retry on any download error
+            wait = 30 * attempt
+            print(f"RIR download try {attempt} failed ({str(err)[:80]}); wait {wait}s")
+            time.sleep(wait)
+    if ds is None:
+        raise SystemExit("Could not download the RIR dataset after 8 tries")
     for i, row in enumerate(ds):
         audio = row["audio"]
         arr = np.asarray(audio["array"], dtype=np.float32)
@@ -747,6 +759,7 @@ def run(args):
 
 
 def main():
+    os.environ["MPLBACKEND"] = "Agg"  # Kaggle sets a notebook-only backend
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("cmd", choices=["setup", "run"])
     ap.add_argument("--stages", default="all")
@@ -758,10 +771,10 @@ def main():
     ap.add_argument("--tts-batch", type=int, default=50)
     ap.add_argument("--real-copies", type=int, default=24)
     ap.add_argument("--real-neg-windows", type=int, default=1200)
-    ap.add_argument("--steps", type=int, default=10000)
-    ap.add_argument("--max-neg-weight", type=float, default=300)
+    ap.add_argument("--steps", type=int, default=30000)
+    ap.add_argument("--max-neg-weight", type=float, default=100)
     ap.add_argument("--target-fp", type=float, default=0.5)
-    ap.add_argument("--b-pos", type=int, default=32)
+    ap.add_argument("--b-pos", type=int, default=64)
     ap.add_argument("--b-neg", type=int, default=32)
     ap.add_argument("--b-acav", type=int, default=64)
     args = ap.parse_args()
