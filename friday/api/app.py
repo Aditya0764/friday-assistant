@@ -8,6 +8,8 @@ Keep it on 127.0.0.1: there is no login, so only this laptop should reach it.
                            plus sources and grounded when a document answered
   POST /voice           -> an audio file (field "file"): returns what Whisper heard (heard)
                            plus the same fields as /chat
+  POST /speak           -> {"text": "..."} returns the spoken text as a WAV file (Piper).
+                           Nothing plays on the laptop's speakers: the browser plays it.
   GET  /documents       -> the stored documents, newest first
   POST /documents       -> a .pdf, .txt or .md file (field "file"): ingested so Friday can answer
                            questions about it. The first upload loads the embedding model.
@@ -19,7 +21,7 @@ The skills are built once and shared by every request, because some remember thi
 turns (the docs skill keeps its place for "keep reading"). A lock runs one turn at a time.
 Skills here are the ones that need no running service (no reminders or music, like Telegram).
 /voice decodes audio with friday.voice.decode (faster-whisper's own file reader breaks on
-PyAV 19) and answers in text; spoken replies in the browser come with the dashboard mic panel.
+PyAV 19). Whisper, the embedder and the Piper voice each load on first use, to save RAM.
 FastAPI already uses /docs for its own help page, which is why uploads go to /documents.
 """
 
@@ -33,7 +35,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Response, UploadFile, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 from friday import db
@@ -45,9 +47,11 @@ from friday.rag.ingest import ingest_file
 from friday.skills.registry import build_registry
 from friday.voice.decode import SAMPLE_RATE, decode_audio_file
 from friday.voice.stt import get_stt
+from friday.voice.tts import get_tts
 
 MAX_TEXT_CHARS = 2000
 MAX_PASTE_CHARS = 200_000
+MAX_SPEAK_CHARS = 3000
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_VOICE_SECONDS = 60
 TRACE_POLL_SECONDS = 0.3
@@ -56,6 +60,7 @@ EMPTY_REPLY = "Sorry, I have nothing to say to that."
 
 Embed = Callable[[list[str]], np.ndarray]
 TranscribeArray = Callable[[np.ndarray], str]
+SpeakFn = Callable[[str], bytes]
 
 
 class ChatIn(BaseModel):
@@ -95,9 +100,18 @@ class PasteIn(BaseModel):
     text: str = Field(min_length=1, max_length=MAX_PASTE_CHARS)
 
 
+class SpeakIn(BaseModel):
+    text: str = Field(min_length=1, max_length=MAX_SPEAK_CHARS)
+
+
 def transcribe_array(audio: np.ndarray) -> str:
     """Speech to text with the shared Whisper model (it loads on the first call)."""
     return get_stt().transcribe(audio).text
+
+
+def speech_wav(text: str) -> bytes:
+    """Text to a WAV file with the shared Piper voice (it loads on the first call)."""
+    return get_tts().synthesize_wav(text)
 
 
 def create_app(
@@ -105,15 +119,18 @@ def create_app(
     llm=None,
     embed_fn: Embed | None = None,
     transcribe: TranscribeArray | None = None,
+    speak: SpeakFn | None = None,
     registry=None,
 ) -> FastAPI:
     """Build the API. The arguments are for tests; the defaults are the real ones."""
     api = FastAPI(title="Friday API")
     hear_audio = transcribe or transcribe_array
+    make_speech = speak or speech_wav
     if registry is None:
         registry = build_registry(db_path=db_path)
     docs_skill = registry.get("docs")
     turn_lock = threading.Lock()  # skills keep state between turns, so one turn at a time
+    speak_lock = threading.Lock()  # one Piper voice, one synthesis at a time
 
     def graph_for(conn):
         extra = {"llm": llm} if llm else {}
@@ -209,6 +226,21 @@ def create_app(
         heard = hear(read_upload(file))
         out = run_chat(heard, "web_voice")
         return VoiceOut(**out.model_dump(), heard=heard)
+
+    @api.post("/speak")
+    def speak_text(body: SpeakIn) -> Response:
+        text = body.text.strip()
+        if not text:
+            raise HTTPException(status_code=422, detail="Nothing to say.")
+        try:
+            with speak_lock:
+                wav = make_speech(text)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Nothing to say.") from None
+        except Exception as exc:  # noqa: BLE001 - never leak internal details to the browser
+            print(f"/speak failed: {type(exc).__name__}: {str(exc)[:200]}")
+            raise HTTPException(status_code=502, detail="Couldn't make speech right now.") from None
+        return Response(content=wav, media_type="audio/wav")
 
     @api.get("/documents", response_model=list[DocOut])
     def list_documents() -> list[DocOut]:

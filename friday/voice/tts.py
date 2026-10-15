@@ -3,14 +3,17 @@
 The voice loads once (in TextToSpeech.__init__). speak() synthesizes in a
 background thread and plays each sentence as soon as it is ready, so audio
 starts after the first sentence instead of after the whole text.
+synthesize_wav() returns the same speech as WAV bytes and plays nothing (used by the web API).
 Run `python -m friday.voice.tts` to test it.
 """
 
 from __future__ import annotations
 
+import io
 import queue
 import threading
 import time
+import wave
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,6 +44,23 @@ class TextToSpeech:
         for _ in self._voice.synthesize("Ready."):
             pass
         self.warmup_ms = int((time.perf_counter() - start) * 1000)
+
+    def synthesize_wav(self, text: str) -> bytes:
+        """Return the spoken text as a WAV file (bytes). Plays nothing, so it is safe for the web."""
+        pieces: list[np.ndarray] = []
+        rate = 0
+        for chunk in self._voice.synthesize(text):
+            rate = chunk.sample_rate
+            pieces.append(np.ascontiguousarray(chunk.audio_int16_array, dtype=np.int16).reshape(-1))
+        if not pieces:
+            raise ValueError("Nothing to say.")
+        buffer = io.BytesIO()
+        with wave.open(buffer, "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(rate)
+            wav.writeframes(np.concatenate(pieces).tobytes())
+        return buffer.getvalue()
 
     def speak(self, text: str) -> TTSResult:
         """Speak text through the default output, sentence by sentence."""
