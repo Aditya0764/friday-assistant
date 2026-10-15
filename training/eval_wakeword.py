@@ -18,6 +18,7 @@ import numpy as np
 
 CHUNK = 1280  # 80 ms at 16 kHz, what openWakeWord expects
 LEAD_SECONDS = 1.0
+TRAIL_SECONDS = 1.0  # the model needs audio after the last word to decide
 
 
 def load_wav(path):
@@ -38,13 +39,18 @@ def chunk_scores(model, audio):
 
 
 def cached_scores(model, path, cache, lead=False):
-    key = hashlib.md5(f"{path.resolve()}:{path.stat().st_size}".encode()).hexdigest()
+    tag = f"{path.resolve()}:{path.stat().st_size}"
+    if lead:
+        tag += f":L{LEAD_SECONDS}T{TRAIL_SECONDS}"
+    key = hashlib.md5(tag.encode()).hexdigest()
     file = cache / f"{key}.npy"
     if file.exists():
         return np.load(file)
     audio = load_wav(path)
     if lead:
-        audio = np.concatenate([np.zeros(int(LEAD_SECONDS * 16000), np.int16), audio])
+        pad_in = np.zeros(int(LEAD_SECONDS * 16000), np.int16)
+        pad_out = np.zeros(int(TRAIL_SECONDS * 16000), np.int16)
+        audio = np.concatenate([pad_in, audio, pad_out])
     scores = chunk_scores(model, audio)
     np.save(file, scores)
     return scores
@@ -87,7 +93,8 @@ def main():
     cache.mkdir(exist_ok=True)
     cooldown = int(args.cooldown * 16000 / CHUNK)
 
-    pos = [cached_scores(model, f, cache, lead=True) for f in wav_files(args.pos)]
+    pos_files = wav_files(args.pos)
+    pos = [cached_scores(model, f, cache, lead=True) for f in pos_files]
     neg_files = wav_files(args.neg)
     if args.max_negative_files:
         neg_files = neg_files[: args.max_negative_files]
@@ -113,6 +120,11 @@ def main():
         print(
             f"Only {hours:.1f} h of negatives: too little to show 0.5/h with zero events."
         )
+    if pos:
+        print("lowest-scoring positive clips (best score within each clip):")
+        ranked = sorted((float(s.max()), f.name) for f, s in zip(pos_files, pos))
+        for score, name in ranked[:6]:
+            print(f"  {name}: {score:.2f}")
     first = []
     for f, s in zip(neg_files, neg):
         for i in count_events(s, args.thresholds[1], cooldown):
