@@ -1,7 +1,10 @@
 """LangGraph pipeline: router -> safety -> skill -> reply (or router -> llm -> reply).
 
 Every node writes one trace row (input, output, ms) under the same run_id.
-- router: rules first (friday.router.router); no match means the LLM handles it.
+- router: rules first (friday.router.router). If no rule matches and the trained model is on
+  (FRIDAY_ROUTER_MODEL=1), it guesses: a confident doc_qa runs the docs skill, another confident
+  skill class answers "please say it again", the rest goes to the LLM. The model's guess is
+  written into the router trace row, e.g. "llm: llm [model other 0.99]".
 - safety: a skill with needs_approval=True only runs if approve(skill_name) says yes.
   With no approve function, risky skills are denied.
 - skill / llm: produce the reply text. The llm node sends the system prompt first (if
@@ -22,9 +25,12 @@ from typing import TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from friday.llm import ask
+from friday.router.model import DEFAULT_THRESHOLD, get_default_classifier
 from friday.router.router import Router
 from friday.skills.base import SkillRegistry
 from friday.trace import Tracer
+
+_UNSET = object()
 
 
 class State(TypedDict, total=False):
@@ -32,7 +38,7 @@ class State(TypedDict, total=False):
     text: str
     history: list[dict]
     args: dict[str, str]
-    via: str  # "rule" or "llm"
+    via: str  # "rule", "model" or "llm"
     skill_name: str
     approved: bool
     reply: str
@@ -46,13 +52,19 @@ def build_graph(
     llm: Callable = ask,
     llm_suffix: str = "",
     system_prompt: str = "",
+    classifier=_UNSET,
+    threshold: float = DEFAULT_THRESHOLD,
 ):
     """Compile the graph.
 
     system_prompt: who Friday is and what it must not claim (sent first to the LLM).
     llm_suffix: optional text appended to the user's sentence (kept for old callers).
+    classifier: the trained router. Left out, it is the shared model when FRIDAY_ROUTER_MODEL
+        is on, otherwise None (rules + LLM only). Pass None to force it off.
     """
-    router = Router(registry)
+    if classifier is _UNSET:
+        classifier = get_default_classifier()
+    router = Router(registry, classifier=classifier, threshold=threshold)
 
     def tracer_for(state: State) -> Tracer:
         return Tracer(conn, state["run_id"])
@@ -61,11 +73,14 @@ def build_graph(
         with tracer_for(state).step("router", state["text"]) as out:
             route = router.route(state["text"])
             name = route.skill.name if route.skill else ""
-            out["output"] = f"{route.via}: {name or 'llm'}"
+            shown = f"{route.via}: {name or 'llm'}"
+            if route.model:
+                shown += f" [model {route.model} {route.conf:.2f}]"
+            out["output"] = shown
         return {"args": route.args, "via": route.via, "skill_name": name}
 
     def after_router(state: State) -> str:
-        return "safety" if state["via"] == "rule" else "llm"
+        return "safety" if state["via"] in ("rule", "model") else "llm"
 
     def safety_node(state: State) -> dict:
         skill = registry.get(state["skill_name"])
@@ -165,8 +180,8 @@ if __name__ == "__main__":
 
     with tempfile.TemporaryDirectory() as tmp:
         conn = db.connect(Path(tmp) / "graph_test.db")
-        deny_app = build_graph(conn, registry, approve=None, llm=fake_llm)
-        yes_app = build_graph(conn, registry, approve=lambda name: True, llm=fake_llm)
+        deny_app = build_graph(conn, registry, approve=None, llm=fake_llm, classifier=None)
+        yes_app = build_graph(conn, registry, approve=lambda name: True, llm=fake_llm, classifier=None)
 
         cases = [
             ("deny", deny_app, "Repeat after me, hello Friday."),

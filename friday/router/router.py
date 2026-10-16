@@ -1,14 +1,21 @@
-"""Router v0: rules first, LLM fallback.
+"""Router: rules first, then (optionally) the trained model, then the LLM.
 
 route(text) cleans the sentence and asks the skill registry who can handle it.
-A skill that says yes is a rule match (via="rule"). If none does, the sentence
-goes to the LLM (skill=None, via="llm").
+1. A skill that says yes is a rule match (via="rule"). Rules and the catch skill always win.
+2. If nobody took it and a model classifier is given, the model guesses the intent:
+   - doc_qa with confidence >= threshold runs the docs skill (via="model"). Docs answers from
+     the document or says it can't, so a wrong guess is safe.
+   - another skill class with confidence >= threshold answers "please say it again" (the catch
+     skill, via="model"): a skill can't act on text its own parser rejected. P6-03 (slot
+     extraction) replaces this.
+   - "other", or confidence below the threshold, goes to the LLM (via="llm"). The guess is still
+     kept in Route.model / Route.conf so it can be logged.
+3. No model (the default), or it isn't ready yet: the sentence goes to the LLM (skill=None).
 
 can_handle receives the CLEAN text (lowercase, no punctuation, but numbers and
 math symbols survive: "What's 18% of 2,400?" -> "what's 18% of 2400").
 args["text"] is what the user said; args["clean"] is the cleaned version.
 
-The trained router (Phase 6) replaces this file. Callers keep using route().
 Run `python -m friday.router.router` for the self-test.
 """
 
@@ -16,15 +23,23 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import Protocol
 
+from friday.router.model import DEFAULT_THRESHOLD
 from friday.skills.base import Skill, SkillRegistry
+
+
+class Classifier(Protocol):
+    def classify(self, clean: str) -> tuple[str, float] | None: ...
 
 
 @dataclass(frozen=True)
 class Route:
     skill: Skill | None  # None = send to the LLM
     args: dict[str, str] = field(default_factory=dict)
-    via: str = "llm"  # "rule" or "llm"
+    via: str = "llm"  # "rule", "model" or "llm"
+    model: str = ""  # the model's guess, when it was asked (even if not used)
+    conf: float = 0.0  # confidence of that guess
 
 
 def normalize(text: str) -> str:
@@ -42,16 +57,31 @@ def normalize(text: str) -> str:
 
 
 class Router:
-    def __init__(self, registry: SkillRegistry) -> None:
+    def __init__(
+        self,
+        registry: SkillRegistry,
+        classifier: Classifier | None = None,
+        threshold: float = DEFAULT_THRESHOLD,
+    ) -> None:
         self.registry = registry
+        self.classifier = classifier
+        self.threshold = threshold
 
     def route(self, text: str) -> Route:
         clean = normalize(text)
         args = {"text": text, "clean": clean}
         skill = self.registry.find(clean)
-        if skill is None:
+        if skill is not None:
+            return Route(skill=skill, args=args, via="rule")
+        guess = self.classifier.classify(clean) if self.classifier and clean else None
+        if guess is None:
             return Route(skill=None, args=args, via="llm")
-        return Route(skill=skill, args=args, via="rule")
+        label, conf = guess
+        if label != "other" and conf >= self.threshold:
+            target = self.registry.get("docs" if label == "doc_qa" else "catch")
+            if target is not None:
+                return Route(skill=target, args=args, via="model", model=label, conf=conf)
+        return Route(skill=None, args=args, via="llm", model=label, conf=conf)
 
 
 if __name__ == "__main__":
