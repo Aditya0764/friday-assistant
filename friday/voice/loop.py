@@ -8,6 +8,8 @@ Wake word (P6-04), OFF by default: set FRIDAY_WAKEWORD=1 before starting. Then o
 mic stream feeds the wake-word detector AND the push-to-talk key, and wake scores are
 logged to data\\wake_log.csv. A leading "hey friday" in what was heard is removed.
 Debug: also set FRIDAY_SAVE_CLIPS=1 to save each command's audio to data\\clips\\.
+Counting false triggers (P6-06): also set FRIDAY_WAKE_DRY=1. Wakes are heard and logged, but
+nothing is transcribed, answered or spoken.
 
 Reminders: a background scheduler speaks them when they are due. A lock makes sure a
 reminder never talks over a reply (it waits until the reply is finished).
@@ -145,8 +147,12 @@ def run_wake(conn, app, stt, tts, speak_lock) -> None:
     print("Loading the wake-word model...")
     detector = WakeWordDetector()
     save_clips = clips_enabled()
+    dry_run = os.environ.get("FRIDAY_WAKE_DRY", "").strip().lower() in ("1", "true", "yes", "on")
 
     def on_audio(audio, source: str) -> bool:
+        if dry_run:  # false-trigger counting: hear and log, do nothing else
+            print(f"    (dry run: {source} heard, nothing processed)")
+            return False
         if save_clips:
             try:
                 print(f"    (clip saved: {save_clip(audio, source).name})")
@@ -177,6 +183,8 @@ def run_wake(conn, app, stt, tts, speak_lock) -> None:
         )
         print(f'Ready. Say "hey friday" (threshold {THRESHOLD}) or hold [{DEFAULT_KEY}].')
         print(f"Wake scores are logged to {WAKE_LOG}. Ctrl+C to quit.")
+        if dry_run:
+            print("DRY RUN: wakes are logged only. Nothing is transcribed, answered or spoken.")
         if save_clips:
             print("Saving each command's audio to data\\clips\\ (debug).")
         listener.run()
