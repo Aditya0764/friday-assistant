@@ -11,6 +11,7 @@ export default defineConfig({
       '/health': API,
       '/chat': API,
       '/voice': API,
+      '/speak': API,
       '/documents': API,
       '/trace': { target: API, ws: true },
     },
