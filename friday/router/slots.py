@@ -32,7 +32,7 @@ _WHEN = {
     "timer": re.compile(rf"\d+ {_UNIT}"),
     "alarm": re.compile(rf"(?:tomorrow )?(?:at )?{_CLOCK}"),
 }
-_PLAY_WORDS = re.compile(r"\b(?:play|put on|listen|hear|queue|start|stream)\b")
+_PLAY_WORDS = re.compile(r"\b(?:play(?:ing)?|put on|listen(?:ing)?|hear(?:ing)?|queue|start|stream)\b")
 
 _LISTS_PROMPT = """You read ONE spoken command about a list or a note and reply with ONE JSON \
 object and nothing else.
@@ -107,7 +107,11 @@ def _digits_ok(when: str, clean: str) -> bool:
 def _lists(data: dict, clean: str) -> str | None:
     action = data.get("action")
     name = _optional(data.get("list"), clean)
-    if name is None or (name and not _LIST_NAME.fullmatch(name)):
+    if name is None:
+            return None
+    name = re.sub(r"^(?:my|the|our|a) ", "", name)
+    name = re.sub(r"(?:^|\s)list$", "", name).strip()  # the skill adds the word "list" itself
+    if name and not _LIST_NAME.fullmatch(name):
         return None
     where = f"my {name} list" if name else "my list"
     if action == "read":

@@ -1,8 +1,13 @@
 """Router: rules first, then (optionally) the trained model, then the LLM.
 
 route(text) cleans the sentence and asks the skill registry who can handle it.
-1. A skill that says yes is a rule match (via="rule"). Rules and the catch skill always win.
-2. If nobody took it and a model classifier is given, the model guesses the intent:
+1. A skill that says yes is a rule match (via="rule"). Rules win, except that the model can
+   help when the catch skill took the sentence (see 2).
+2. The catch skill took it ("please say it again") and a model is on: the model guesses. A
+   confident lists/reminders/music class sets Route.slots_for (via="model") so the graph asks
+   the LLM for the details; catch stays as the fallback. The model NEVER sends a catch
+   sentence to the chat LLM, because the LLM could fake an action.
+3. Nobody took it and a model classifier is given: the model guesses the intent:
    - doc_qa with confidence >= threshold runs the docs skill (via="model"). Docs answers from
      the document or says it can't, so a wrong guess is safe.
    - lists_notes / timers_reminders / music with confidence >= threshold: Route.slots_for is
@@ -11,7 +16,7 @@ route(text) cleans the sentence and asks the skill registry who can handle it.
    - any other skill class at confidence >= threshold: "please say it again" (catch skill).
    - "other", or confidence below the threshold, goes to the LLM (via="llm"). The guess is still
      kept in Route.model / Route.conf so it can be logged.
-3. No model (the default), or it isn't ready yet: the sentence goes to the LLM (skill=None).
+4. No model (the default), or it isn't ready yet: the sentence goes to the LLM (skill=None).
 
 can_handle receives the CLEAN text (lowercase, no punctuation, but numbers and
 math symbols survive: "What's 18% of 2,400?" -> "what's 18% of 2400").
@@ -72,13 +77,29 @@ class Router:
         self.classifier = classifier
         self.threshold = threshold
 
+    def _can_fill(self, label: str) -> bool:
+        wanted = SLOT_SKILLS.get(label, "")
+        return bool(wanted) and self.registry.get(wanted) is not None
+
     def route(self, text: str) -> Route:
         clean = normalize(text)
         args = {"text": text, "clean": clean}
         skill = self.registry.find(clean)
-        if skill is not None:
+        if skill is not None and skill.name != "catch":
             return Route(skill=skill, args=args, via="rule")
         guess = self.classifier.classify(clean) if self.classifier and clean else None
+        if skill is not None:
+            # The catch skill took it ("please say it again"). The model may only help: a
+            # confident lists/reminders/music class asks for the slots, with catch as the
+            # fallback. It never sends a catch sentence to the chat LLM (the LLM could fake it).
+            if guess is None:
+                return Route(skill=skill, args=args, via="rule")
+            label, conf = guess
+            slots_for = label if conf >= self.threshold and self._can_fill(label) else ""
+            return Route(
+                skill=skill, args=args, via="model" if slots_for else "rule",
+                model=label, conf=conf, slots_for=slots_for,
+            )
         if guess is None:
             return Route(skill=None, args=args, via="llm")
         label, conf = guess
@@ -88,8 +109,7 @@ class Router:
                 target = self.registry.get("docs")
             else:
                 target = self.registry.get("catch")
-                wanted = SLOT_SKILLS.get(label, "")
-                if wanted and self.registry.get(wanted) is not None:
+                if self._can_fill(label):
                     slots_for = label
             if target is not None:
                 return Route(

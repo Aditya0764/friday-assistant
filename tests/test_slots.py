@@ -222,3 +222,53 @@ def test_graph_bad_slots_say_it_again_and_do_nothing(parts, tmp_path):
     assert "say it again" in state["reply"].lower()
     assert player.calls == []
     conn.close()
+
+def test_hearing_counts_as_a_play_word(parts):
+    registry, _, _ = parts
+    found = _fill(
+        registry, "music", "i feel like hearing believer by imagine dragons",
+        '{"action":"play","song":"believer","artist":"imagine dragons"}',
+    )
+    assert found is not None
+    assert found[1]["clean"] == "play believer by imagine dragons"
+
+
+CAUGHT = "stick bread on the grocery list"  # the catch skill takes this one
+
+
+def test_model_can_upgrade_a_catch_sentence_to_slots(parts):
+    registry, _, _ = parts
+    route = Router(registry, _Classifier(("lists_notes", 0.95))).route(CAUGHT)
+    assert (route.via, route.skill.name, route.slots_for) == ("model", "catch", "lists_notes")
+
+
+def test_model_never_sends_a_catch_sentence_to_the_llm(parts):
+    registry, _, _ = parts
+    for answer in (("other", 1.0), ("lists_notes", 0.5), ("math_time", 0.99), None):
+        route = Router(registry, _Classifier(answer)).route(CAUGHT)
+        assert route.skill.name == "catch"
+        assert route.via == "rule"
+        assert route.slots_for == ""
+
+
+def test_graph_catch_sentence_gets_slots_and_runs_the_skill(parts, tmp_path):
+    registry, _, _ = parts
+    conn = db.connect(tmp_path / "graph.db")
+    fake = _llm('{"action":"add","items":["bread"],"list":"grocery"}')
+    app = build_graph(conn, registry, llm=fake, classifier=_Classifier(("lists_notes", 0.97)))
+    state = run_turn(app, CAUGHT)
+    assert "bread" in state["reply"] and "grocery" in state["reply"]
+    assert [row["step"] for row in db.get_traces(conn, state["run_id"])] == [
+        "router", "slots", "safety", "skill", "reply",
+    ]
+    conn.close()
+
+@pytest.mark.parametrize("said_list", ["grocery", "grocery list", "the grocery list"])
+def test_list_name_never_gets_a_second_list_word(parts, said_list):
+    registry, _, _ = parts
+    found = _fill(
+        registry, "lists_notes", "stick bread on the grocery list",
+        '{"action":"add","items":["bread"],"list":"' + said_list + '"}',
+    )
+    assert found is not None
+    assert found[1]["clean"] == "add bread to my grocery list"
