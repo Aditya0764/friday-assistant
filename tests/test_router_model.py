@@ -106,7 +106,7 @@ def test_no_classifier_is_the_old_behaviour():
 
 def test_graph_model_path_skips_the_llm(conn):
     fake_llm = _FakeLLM()
-    app = build_graph(conn, build_registry(), llm=fake_llm, classifier=_FakeClassifier(("music", 0.97)))
+    app = build_graph(conn, build_registry(), llm=fake_llm, classifier=_FakeClassifier(("math_time", 0.97)))
     state = run_turn(app, NOBODY_TAKES_THIS)
     assert state["via"] == "model"
     assert "say it again" in state["reply"].lower()

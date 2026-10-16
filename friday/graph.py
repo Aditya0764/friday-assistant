@@ -2,9 +2,13 @@
 
 Every node writes one trace row (input, output, ms) under the same run_id.
 - router: rules first (friday.router.router). If no rule matches and the trained model is on
-  (FRIDAY_ROUTER_MODEL=1), it guesses: a confident doc_qa runs the docs skill, another confident
-  skill class answers "please say it again", the rest goes to the LLM. The model's guess is
-  written into the router trace row, e.g. "llm: llm [model other 0.99]".
+  (FRIDAY_ROUTER_MODEL=1), it guesses: a confident doc_qa runs the docs skill, a confident
+  lists/reminders/music goes to the slots node, another skill class answers "please say it
+  again", the rest goes to the LLM. The model's guess is written into the router trace row,
+  e.g. "llm: llm [model other 0.99]".
+- slots: asks the LLM for the details (item, time, song) as JSON, checks them, and hands the
+  skill a plain sentence its own rules accept. If anything fails, the router's "please say it
+  again" stays. The LLM never acts or speaks here (friday.router.slots).
 - safety: a skill with needs_approval=True only runs if approve(skill_name) says yes.
   With no approve function, risky skills are denied.
 - skill / llm: produce the reply text. The llm node sends the system prompt first (if
@@ -27,6 +31,7 @@ from langgraph.graph import END, START, StateGraph
 from friday.llm import ask
 from friday.router.model import DEFAULT_THRESHOLD, get_default_classifier
 from friday.router.router import Router
+from friday.router.slots import fill_slots
 from friday.skills.base import SkillRegistry
 from friday.trace import Tracer
 
@@ -40,6 +45,7 @@ class State(TypedDict, total=False):
     args: dict[str, str]
     via: str  # "rule", "model" or "llm"
     skill_name: str
+    slots_for: str  # router class whose slots the slots node should fill, else ""
     approved: bool
     reply: str
     provider: str
@@ -77,10 +83,28 @@ def build_graph(
             if route.model:
                 shown += f" [model {route.model} {route.conf:.2f}]"
             out["output"] = shown
-        return {"args": route.args, "via": route.via, "skill_name": name}
+        return {
+            "args": route.args,
+            "via": route.via,
+            "skill_name": name,
+            "slots_for": route.slots_for,
+        }
 
     def after_router(state: State) -> str:
-        return "safety" if state["via"] in ("rule", "model") else "llm"
+        if state["via"] not in ("rule", "model"):
+            return "llm"
+        return "slots" if state.get("slots_for") else "safety"
+
+    def slots_node(state: State) -> dict:
+        label = state["slots_for"]
+        with tracer_for(state).step("slots", f"{label}: {state['text']}") as out:
+            found = fill_slots(label, state["text"], state["args"]["clean"], registry, llm)
+            if found is None:
+                out["output"] = "no valid slots: asking to say it again"
+                return {}
+            skill, args = found
+            out["output"] = f"{skill.name}: {args['text']}"
+        return {"skill_name": skill.name, "args": args}
 
     def safety_node(state: State) -> dict:
         skill = registry.get(state["skill_name"])
@@ -125,13 +149,17 @@ def build_graph(
 
     graph = StateGraph(State)
     graph.add_node("router", router_node)
+    graph.add_node("slots", slots_node)
     graph.add_node("safety", safety_node)
     graph.add_node("skill", skill_node)
     graph.add_node("llm", llm_node)
     graph.add_node("reply", reply_node)
 
     graph.add_edge(START, "router")
-    graph.add_conditional_edges("router", after_router, {"safety": "safety", "llm": "llm"})
+    graph.add_conditional_edges(
+        "router", after_router, {"safety": "safety", "slots": "slots", "llm": "llm"}
+    )
+    graph.add_edge("slots", "safety")
     graph.add_conditional_edges("safety", after_safety, {"skill": "skill", "reply": "reply"})
     graph.add_edge("skill", "reply")
     graph.add_edge("llm", "reply")

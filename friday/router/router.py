@@ -5,9 +5,10 @@ route(text) cleans the sentence and asks the skill registry who can handle it.
 2. If nobody took it and a model classifier is given, the model guesses the intent:
    - doc_qa with confidence >= threshold runs the docs skill (via="model"). Docs answers from
      the document or says it can't, so a wrong guess is safe.
-   - another skill class with confidence >= threshold answers "please say it again" (the catch
-     skill, via="model"): a skill can't act on text its own parser rejected. P6-03 (slot
-     extraction) replaces this.
+   - lists_notes / timers_reminders / music with confidence >= threshold: Route.slots_for is
+     set, so the graph asks the LLM for the details (friday.router.slots). If that fails, the
+     catch skill (already in Route.skill) answers "please say it again".
+   - any other skill class at confidence >= threshold: "please say it again" (catch skill).
    - "other", or confidence below the threshold, goes to the LLM (via="llm"). The guess is still
      kept in Route.model / Route.conf so it can be logged.
 3. No model (the default), or it isn't ready yet: the sentence goes to the LLM (skill=None).
@@ -28,6 +29,9 @@ from typing import Protocol
 from friday.router.model import DEFAULT_THRESHOLD
 from friday.skills.base import Skill, SkillRegistry
 
+# Router classes whose details (slots) the LLM can fill, and the skill that then runs.
+SLOT_SKILLS = {"lists_notes": "lists", "timers_reminders": "reminders", "music": "music"}
+
 
 class Classifier(Protocol):
     def classify(self, clean: str) -> tuple[str, float] | None: ...
@@ -40,6 +44,7 @@ class Route:
     via: str = "llm"  # "rule", "model" or "llm"
     model: str = ""  # the model's guess, when it was asked (even if not used)
     conf: float = 0.0  # confidence of that guess
+    slots_for: str = ""  # router class whose slots the graph should fill, else ""
 
 
 def normalize(text: str) -> str:
@@ -78,9 +83,19 @@ class Router:
             return Route(skill=None, args=args, via="llm")
         label, conf = guess
         if label != "other" and conf >= self.threshold:
-            target = self.registry.get("docs" if label == "doc_qa" else "catch")
+            slots_for = ""
+            if label == "doc_qa":
+                target = self.registry.get("docs")
+            else:
+                target = self.registry.get("catch")
+                wanted = SLOT_SKILLS.get(label, "")
+                if wanted and self.registry.get(wanted) is not None:
+                    slots_for = label
             if target is not None:
-                return Route(skill=target, args=args, via="model", model=label, conf=conf)
+                return Route(
+                    skill=target, args=args, via="model", model=label, conf=conf,
+                    slots_for=slots_for,
+                )
         return Route(skill=None, args=args, via="llm", model=label, conf=conf)
 
 
