@@ -35,15 +35,18 @@ class SpeechToText:
         self._model = WhisperModel(model_name, device="cpu", compute_type="int8")
         self.load_ms = int((time.perf_counter() - start) * 1000)
 
-    def transcribe(self, audio: str | Path | np.ndarray) -> STTResult:
-        """audio: a wav file path, or a mono float32 array at 16 kHz."""
+    def transcribe(self, audio: str | Path | np.ndarray, vad: bool = False) -> STTResult:
+        """audio: a wav file path, or a mono float32 array at 16 kHz.
+
+        vad=True switches on faster-whisper's built-in speech detector, so clips with no real
+        speech come back as empty text instead of an invented sentence. Off by default."""
         if isinstance(audio, np.ndarray):
             audio = np.ascontiguousarray(audio, dtype=np.float32)
         else:
             audio = str(audio)
 
         start = time.perf_counter()
-        segments, _info = self._model.transcribe(audio, language="en")
+        segments, _info = self._model.transcribe(audio, language="en", vad_filter=vad)
         text = " ".join(seg.text.strip() for seg in segments).strip()
         ms = int((time.perf_counter() - start) * 1000)
         return STTResult(text=text, model=self.model_name, ms=ms)
