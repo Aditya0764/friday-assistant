@@ -27,6 +27,16 @@ One sample per row: LLM answers vary between runs, so read the replies, not just
 
 --only ID,ID,...  runs just those rows (for a small smoke test).
 
+--wav-dir DIR (spoken test, P7-04) runs each row on what Friday HEARD instead of the typed text.
+DIR/<row id>.wav is decoded with friday.voice.decode, then transcribed by Friday's own
+SpeechToText (vad=True, change with --no-vad). The STT only ever gets an array, never a path.
+Transcripts are cached in a JSON (default <out-dir>/eval_100_heard_<DIR name>.json, or --transcripts)
+keyed by the WAV's hash, so a router OFF run and a router ON run see IDENTICAL text and the second
+run loads no Whisper at all. Only setup commands stay typed. A row with no WAV (or one that will not
+decode) is no_audio: left out of the totals and listed. An empty transcript is a failed row, counted
+(the graph is not called, as in the voice loop). Reports gain a "Heard" column. Without --wav-dir
+nothing changes. No audio is ever copied or written to the results.
+
 Run: set PYTHONPATH=.  then  python evals\\run_eval_100.py --label before
 Writes evals/results/eval_100_<label>.json and .md. Refuses to overwrite an existing label.
 Exit code is 0 whatever the scores are. Non-zero only for a bad command line, a label clash, a
@@ -51,6 +61,7 @@ from __future__ import annotations
 import argparse
 import csv
 import functools
+import hashlib
 import json
 import os
 import re
@@ -93,6 +104,7 @@ STUB_REPLY = "(stub reply)"
 NOT_CHECKED = "not_checked_offline"
 RUNNER_ERROR = "runner_error"
 NO_EFFECT_SPEC = "no_effect_spec"
+NO_AUDIO = "no_audio"
 LIVE_HOSTS = frozenset({"api.groq.com", "generativelanguage.googleapis.com"})
 PAUSE_S = 1.0  # between live LLM calls, to be gentle with rate limits
 MAX_RUNNER_ERRORS = 3  # in a row, then the run stops
@@ -662,6 +674,116 @@ def run_all(rows, classifier, probe=None, max_errors=MAX_RUNNER_ERRORS, say=prin
     return done, True
 
 
+# ---------- spoken rows (--wav-dir) ----------
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load_transcripts(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8")).get("entries", {})
+
+
+def save_transcripts(path: Path, entries: dict) -> None:
+    """Atomic, so an interrupted run leaves a valid cache and the next run resumes."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps({"entries": entries}, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def transcribe_rows(rows, wav_dir: Path, stt_factory, decode, vad: bool, cache_path: Path,
+                    model_name: str, say=print) -> dict[str, dict]:
+    """What Friday heard for each row: {id: {"state": "ok" | "no_audio", "heard", "detail"}}.
+
+    A cached transcript is reused when the WAV's hash, the vad flag and the STT model all match, so
+    a second run never transcribes again (and never loads the model). `stt_factory` is only called
+    when something really has to be transcribed.
+    """
+    entries = load_transcripts(cache_path)
+    stt = None
+    out: dict[str, dict] = {}
+    for row in rows:
+        row_id = row["id"]
+        wav = wav_dir / f"{row_id}.wav"
+        if not wav.is_file():
+            out[row_id] = {"state": NO_AUDIO, "heard": "", "detail": "no WAV file"}
+            continue
+        digest = file_sha256(wav)
+        cached = entries.get(row_id)
+        if (cached and cached["sha256"] == digest and cached["vad"] == vad
+                and cached["model"] == model_name):
+            out[row_id] = {"state": "ok", "heard": cached["heard"], "detail": "cached"}
+            continue
+        if cached:
+            say(f"WARNING: {row_id}: WAV, vad or model changed since it was cached; transcribing "
+                "again. Earlier runs used the OLD text: re-run both router OFF and ON.")
+        try:
+            audio = decode(wav)
+        except Exception as exc:  # noqa: BLE001 - a recording fault, not a Friday failure
+            out[row_id] = {"state": NO_AUDIO, "heard": "",
+                           "detail": f"could not decode ({type(exc).__name__})"}
+            continue
+        if stt is None:
+            stt = stt_factory()
+        heard = stt.transcribe(audio, vad=vad).text.strip()
+        entries[row_id] = {"sha256": digest, "vad": vad, "model": model_name, "heard": heard}
+        save_transcripts(cache_path, entries)
+        out[row_id] = {"state": "ok", "heard": heard, "detail": "transcribed"}
+    return out
+
+
+def empty_result(row: dict, status: str, detail: str) -> dict:
+    """A row the graph never ran on (empty transcript, or no audio). Same keys as run_row."""
+    return {
+        **row,
+        "routed": "",
+        "router_trace": "",
+        "reply": "",
+        "routing_ok": False,
+        "result_ok": None if row["expected_skill"] == "llm" else False,
+        "effect_ok": False,
+        "effect_detail": detail,
+        "setup_ok": True,
+        "setup_log": [],
+        "player_calls": [],
+        "llm_calls": [],
+        "provider_failures": [],
+        "runner_errors": [],
+        "blocked_hosts": [],
+        "action_claim": None,
+        "ms": 0,
+        "status": status,
+    }
+
+
+def run_all_spoken(rows, heard: dict, classifier, probe=None, max_errors=MAX_RUNNER_ERRORS,
+                   say=print):
+    """Like run_all, but each row runs on its transcript. Returns (finished rows, complete?)."""
+    done: list[dict] = []
+    streak = 0
+    for row in rows:
+        h = heard[row["id"]]
+        if h["state"] == NO_AUDIO:
+            result = empty_result(row, NO_AUDIO, h["detail"])
+        elif not h["heard"]:
+            result = empty_result(row, "fail", "empty transcript")
+        else:
+            result = run_row({**row, "text": h["heard"]}, classifier, probe)
+            result["text"] = row["text"]  # the sentence that was meant; `heard` is what Friday got
+        result["heard"] = h["heard"]
+        done.append(result)
+        say(f"{result['id']:7} {result['status']:20} routed={result['routed']}")
+        streak = streak + 1 if result["status"] == RUNNER_ERROR else 0
+        if streak >= max_errors:
+            say(f"\nStopping: {streak} runner errors in a row.")
+            return done, False
+    return done, True
+
+
 # ---------- reports ----------
 
 
@@ -741,6 +863,19 @@ def write_reports(args, rows: list[dict], summary: dict, meta: dict) -> tuple[Pa
             f"at {NOW.isoformat()}. No network."
         )
         chat_line = "Chat rows (expected llm) are scored on routing only: the reply is a stub."
+    spoken = bool(meta.get("wav_dir"))
+    spoken_lines = []
+    if spoken:
+        sp = meta["spoken"]
+        spoken_lines = [
+            (
+                f"Spoken test: each row ran on what Friday HEARD ({sp['transcribed']} transcribed, "
+                f"{sp['empty']} empty transcripts counted as failures, {sp['no_audio']} with no "
+                f"audio left out of the totals). STT {meta['stt_model']}, vad={meta['vad']}. "
+                f"Transcripts: {meta['transcripts_file']} (sha256 {meta['transcripts_sha256'][:12]}). "
+                "Setup commands stay typed."
+            ),
+        ]
     lines = [
         f"# Eval 100: {args.label} ({meta['date']})",
         "",
@@ -761,6 +896,7 @@ def write_reports(args, rows: list[dict], summary: dict, meta: dict) -> tuple[Pa
         "",
         setup_line,
         chat_line,
+        *spoken_lines,
         (
             "A row passes only if routing, reply and database effect are all right. A runner "
             "error (LLM, network or embedder problem) is not a Friday failure and is not in "
@@ -793,23 +929,28 @@ def write_reports(args, rows: list[dict], summary: dict, meta: dict) -> tuple[Pa
         "",
         "## Failed rows",
         "",
-        "| Id | Text | Wanted | Routed | Reply | Why |",
-        "|---|---|---|---|---|---|",
+        "| Id | Text | Heard | Wanted | Routed | Reply | Why |" if spoken
+        else "| Id | Text | Wanted | Routed | Reply | Why |",
+        "|---|---|---|---|---|---|---|" if spoken else "|---|---|---|---|---|---|",
     ]
     for r in rows:
         if r["status"] != "fail":
             continue
         why = []
-        if not r["setup_ok"]:
-            why.append("setup failed")
-        if not r["routing_ok"]:
-            why.append("routing")
-        if r["result_ok"] is False:
-            why.append("reply")
-        if not r["effect_ok"]:
-            why.append(f"db: {r['effect_detail']}")
+        if spoken and not r["heard"]:
+            why.append("empty transcript")
+        else:
+            if not r["setup_ok"]:
+                why.append("setup failed")
+            if not r["routing_ok"]:
+                why.append("routing")
+            if r["result_ok"] is False:
+                why.append("reply")
+            if not r["effect_ok"]:
+                why.append(f"db: {r['effect_detail']}")
+        heard_cell = f" {_cell(r['heard'])} |" if spoken else ""
         lines.append(
-            f"| {r['id']} | {_cell(r['text'])} | {r['expected_skill']} "
+            f"| {r['id']} | {_cell(r['text'])} |{heard_cell} {r['expected_skill']} "
             f"| {r['routed']} ({_cell(r['router_trace'])}) | {_cell(r['reply'])} | {_cell(', '.join(why))} |"
         )
     lines += [
@@ -826,6 +967,17 @@ def write_reports(args, rows: list[dict], summary: dict, meta: dict) -> tuple[Pa
             if r["blocked_hosts"]:
                 detail += f", blocked: {', '.join(sorted(set(r['blocked_hosts'])))}"
             lines.append(f"| {r['id']} | {_cell(r['text'])} | {err['kind']} | {_cell(detail)} |")
+    if spoken:
+        lines += [
+            "",
+            "## No audio (not in the totals; record or fix these WAVs)",
+            "",
+            "| Id | Text | Why |",
+            "|---|---|---|",
+        ]
+        for r in rows:
+            if r["status"] == NO_AUDIO:
+                lines.append(f"| {r['id']} | {_cell(r['text'])} | {_cell(r['effect_detail'])} |")
     lines += [
         "",
         "## Rows with no effect spec (not in the totals; add expected_effect to the CSV)",
@@ -889,12 +1041,15 @@ def write_reports(args, rows: list[dict], summary: dict, meta: dict) -> tuple[Pa
         "",
         "## Every row",
         "",
-        "| Id | Status | Text | Routed | Reply |",
-        "|---|---|---|---|---|",
+        "| Id | Status | Text | Heard | Routed | Reply |" if spoken
+        else "| Id | Status | Text | Routed | Reply |",
+        "|---|---|---|---|---|---|" if spoken else "|---|---|---|---|---|",
     ]
     for r in rows:
+        heard_cell = f" {_cell(r['heard'])} |" if spoken else ""
         lines.append(
-            f"| {r['id']} | {r['status']} | {_cell(r['text'])} | {r['routed']} | {_cell(r['reply'])} |"
+            f"| {r['id']} | {r['status']} | {_cell(r['text'])} |{heard_cell} {r['routed']} "
+            f"| {_cell(r['reply'])} |"
         )
     with md_path.open("x", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
@@ -946,6 +1101,12 @@ def main() -> None:
     parser.add_argument("--only", default="", help="comma-separated row ids, e.g. CHT-01,REM-09")
     parser.add_argument("--csv", type=Path, default=CSV_PATH, help="eval file (default eval_100.csv)")
     parser.add_argument("--out-dir", type=Path, default=OUT, help="where results go")
+    parser.add_argument("--wav-dir", type=Path, default=None,
+                        help="spoken test: run each row on the transcript of <dir>/<row id>.wav")
+    parser.add_argument("--vad", action=argparse.BooleanOptionalAction, default=True,
+                        help="voice-activity filter in the STT (spoken test only; default on)")
+    parser.add_argument("--transcripts", type=Path, default=None,
+                        help="transcript cache (default <out-dir>/eval_100_heard_<wav-dir name>.json)")
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9_-]+", args.label):
         raise SystemExit("--label may only use letters, digits, - and _")
@@ -961,9 +1122,23 @@ def main() -> None:
         if unknown:
             raise SystemExit(f"--only: unknown ids {unknown}")
         rows = [r for r in rows if r["id"] in wanted]
+    if args.wav_dir and not args.wav_dir.is_dir():
+        raise SystemExit(f"--wav-dir {args.wav_dir} is not a folder.")
 
     guard = NetworkGuard(LIVE_HOSTS if args.live_llm else frozenset())
     guard.install()
+    heard = None
+    transcripts_path = None
+    if args.wav_dir:
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")  # Whisper must come from the local cache
+        os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+        from friday.voice.decode import decode_audio_file
+        from friday.voice.stt import DEFAULT_MODEL, get_stt
+
+        transcripts_path = args.transcripts or args.out_dir / f"eval_100_heard_{args.wav_dir.name}.json"
+        heard = transcribe_rows(rows, args.wav_dir, lambda: get_stt(DEFAULT_MODEL),
+                                decode_audio_file, args.vad, transcripts_path, DEFAULT_MODEL)
+        print(f"Transcripts: {transcripts_path}")
     probe = None
     if args.live_llm:
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -981,7 +1156,10 @@ def main() -> None:
         if classifier.error:
             raise SystemExit(f"Router model not loaded ({classifier.error}).")
 
-    done, complete = run_all(rows, classifier, probe)
+    if heard is None:
+        done, complete = run_all(rows, classifier, probe)
+    else:
+        done, complete = run_all_spoken(rows, heard, classifier, probe)
     summary = summarize(done)
     meta = {
         "label": args.label,
@@ -999,6 +1177,19 @@ def main() -> None:
         "rows_total": total_rows if not args.only else len(rows),
         "blocked_hosts": sorted(set(guard.blocked)),
     }
+    if heard is not None:
+        meta.update(
+            wav_dir=str(args.wav_dir),
+            vad=args.vad,
+            stt_model=DEFAULT_MODEL,
+            transcripts_file=transcripts_path.name,
+            transcripts_sha256=file_sha256(transcripts_path) if transcripts_path.exists() else "",
+            spoken={
+                "transcribed": sum(1 for r in done if r.get("heard")),
+                "empty": sum(1 for r in done if r["status"] == "fail" and not r.get("heard")),
+                "no_audio": sum(r["status"] == NO_AUDIO for r in done),
+            },
+        )
     args.out_dir.mkdir(parents=True, exist_ok=True)
     json_path, md_path = write_reports(args, done, summary, meta)
     t = summary["checked"]
