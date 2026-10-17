@@ -1,8 +1,10 @@
 """Trained router (Phase 6): the DistilBERT intent classifier in models/router_v2.
 
-Off by default. Set FRIDAY_ROUTER_MODEL=1 to switch it on (it is read when the graph is built).
+On by default. Set FRIDAY_ROUTER_MODEL=0 (or false/off/no) to switch it off; it is read when the
+graph is built.
 The model loads in a background thread, so a turn never waits for torch: until it is ready,
 classify() returns None and the turn goes to the rules and the LLM as before.
+If models/router_v2 is missing or fails to load, it stays that way: one log line, no crash.
 
 It answers with (class, confidence). Classes: doc_qa, lists_notes, math_time, music, other,
 timers_reminders. Input is the CLEAN text from friday.router.router.normalize.
@@ -20,6 +22,7 @@ MODEL_DIR = Path(__file__).resolve().parents[2] / "models" / "router_v2"
 MAXLEN = 64
 DEFAULT_THRESHOLD = 0.9
 ENV_FLAG = "FRIDAY_ROUTER_MODEL"
+OFF_VALUES = ("0", "false", "off", "no")
 CLASSES = {"doc_qa", "lists_notes", "math_time", "music", "other", "timers_reminders"}
 
 _shared: dict = {}
@@ -46,6 +49,13 @@ class ModelClassifier:
         return self._ready.is_set()
 
     def _load(self) -> None:
+        if not (self.model_dir / "config.json").is_file():  # fresh clone: skip the torch import
+            self.error = "ModelNotFound"
+            print(
+                f"Router model not found at {self.model_dir}. Friday keeps using rules + LLM "
+                f"(set {ENV_FLAG}=0 to stop looking)."
+            )
+            return
         try:
             import torch
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -84,9 +94,14 @@ class ModelClassifier:
         return (label if label in CLASSES else "other"), float(conf)
 
 
+def router_model_enabled() -> bool:
+    """On unless FRIDAY_ROUTER_MODEL is 0/false/off/no. Unset or empty means on."""
+    return os.environ.get(ENV_FLAG, "").strip().lower() not in OFF_VALUES
+
+
 def get_default_classifier() -> ModelClassifier | None:
-    """The shared classifier when FRIDAY_ROUTER_MODEL is on, else None. Built once."""
-    if os.environ.get(ENV_FLAG, "").strip().lower() not in ("1", "true", "on", "yes"):
+    """The shared classifier unless FRIDAY_ROUTER_MODEL turns it off, else None. Built once."""
+    if not router_model_enabled():
         return None
     with _shared_lock:
         if "classifier" not in _shared:

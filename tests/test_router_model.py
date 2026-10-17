@@ -1,5 +1,7 @@
 """Router v1 (P6-02): the trained model after the rules. A fake classifier stands in for torch."""
 
+import builtins
+import functools
 from types import SimpleNamespace
 
 import pytest
@@ -126,22 +128,101 @@ def test_graph_llm_path_logs_the_model_guess(conn):
     assert "model other 0.99" in rows[0]["output"]
 
 
-def test_default_classifier_is_off_without_the_flag(monkeypatch):
-    monkeypatch.delenv(model_module.ENV_FLAG, raising=False)
-    assert model_module.get_default_classifier() is None
-
-
-def test_default_classifier_is_built_once_when_flagged(monkeypatch):
-    monkeypatch.setenv(model_module.ENV_FLAG, "1")
+@pytest.fixture
+def built(monkeypatch):
+    """Stub ModelClassifier (no torch) and record how many were built."""
     monkeypatch.setattr(model_module, "_shared", {})
-    built = []
+    made = []
 
     class _Stub:
         def __init__(self):
-            built.append(1)
+            made.append(1)
 
     monkeypatch.setattr(model_module, "ModelClassifier", _Stub)
+    return made
+
+
+def test_default_classifier_is_on_without_the_flag(monkeypatch, built):
+    monkeypatch.delenv(model_module.ENV_FLAG, raising=False)
+    assert model_module.get_default_classifier() is not None
+    assert len(built) == 1
+
+
+@pytest.mark.parametrize("value", ["0", "false", "off", "no", " OFF ", "False"])
+def test_flag_zero_and_friends_turn_it_off(monkeypatch, built, value):
+    monkeypatch.setenv(model_module.ENV_FLAG, value)
+    assert model_module.get_default_classifier() is None
+    assert built == []
+
+
+@pytest.mark.parametrize("value", ["1", "true", "on", "", "maybe"])
+def test_flag_one_empty_or_anything_else_is_on(monkeypatch, built, value):
+    monkeypatch.setenv(model_module.ENV_FLAG, value)
+    assert model_module.get_default_classifier() is not None
+    assert len(built) == 1
+
+
+def test_default_classifier_is_built_once(monkeypatch, built):
+    monkeypatch.setenv(model_module.ENV_FLAG, "1")
     first = model_module.get_default_classifier()
     second = model_module.get_default_classifier()
     assert first is second
     assert len(built) == 1
+
+
+def _no_torch(monkeypatch):
+    """Importing torch or transformers fails the test: they must not even be tried."""
+    real_import = builtins.__import__
+
+    def guarded(name, *args, **kwargs):
+        if name.split(".")[0] in ("torch", "transformers"):
+            raise AssertionError(f"{name} was imported")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded)
+
+
+def test_missing_model_files_fall_back_with_one_log_line(tmp_path, monkeypatch, capsys):
+    _no_torch(monkeypatch)
+    clf = model_module.ModelClassifier(model_dir=tmp_path / "nope", background=False)
+    assert clf.ready is False and clf.error == "ModelNotFound"
+    assert clf.classify("what all is on my shopping list") is None
+    lines = capsys.readouterr().out.strip().splitlines()
+    assert len(lines) == 1 and "rules + LLM" in lines[0] and "FRIDAY_ROUTER_MODEL=0" in lines[0]
+
+
+def test_unreadable_model_files_fall_back_without_a_crash(tmp_path, monkeypatch, capsys):
+    (tmp_path / "config.json").write_text("{}", encoding="utf-8")  # there, but not a real model
+
+    real_import = builtins.__import__
+
+    def guarded(name, *args, **kwargs):
+        if name.split(".")[0] in ("torch", "transformers"):
+            raise OSError("cannot read the model")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded)
+    clf = model_module.ModelClassifier(model_dir=tmp_path, background=False)
+    assert clf.ready is False and clf.error == "OSError"
+    assert clf.classify("add milk") is None
+    lines = capsys.readouterr().out.strip().splitlines()
+    assert len(lines) == 1 and "rules + LLM" in lines[0]
+
+
+def test_default_with_missing_model_logs_once_and_the_graph_uses_the_llm(
+    conn, tmp_path, monkeypatch, capsys
+):
+    _no_torch(monkeypatch)
+    monkeypatch.delenv(model_module.ENV_FLAG, raising=False)
+    monkeypatch.setattr(model_module, "_shared", {})
+    monkeypatch.setattr(  # the real class, pointed at a missing folder, loading in-line
+        model_module,
+        "ModelClassifier",
+        functools.partial(model_module.ModelClassifier, tmp_path / "nope", background=False),
+    )
+    fake_llm = _FakeLLM()
+    for _ in range(2):  # two graphs, like the API building one per turn
+        app = build_graph(conn, build_registry(), llm=fake_llm)
+        state = run_turn(app, NOBODY_TAKES_THIS)
+    assert state["via"] == "llm" and len(fake_llm.calls) == 2
+    assert capsys.readouterr().out.count("Router model not found") == 1

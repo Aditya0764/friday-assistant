@@ -2,7 +2,7 @@
 
 Every node writes one trace row (input, output, ms) under the same run_id.
 - router: rules first (friday.router.router). If no rule matches and the trained model is on
-  (FRIDAY_ROUTER_MODEL=1), it guesses: a confident doc_qa runs the docs skill, a confident
+  (on by default; FRIDAY_ROUTER_MODEL=0 turns it off), it guesses: a confident doc_qa runs the docs skill, a confident
   lists/reminders/music goes to the slots node, another skill class answers "please say it
   again", the rest goes to the LLM. The model's guess is written into the router trace row,
   e.g. "llm: llm [model other 0.99]".
@@ -65,8 +65,8 @@ def build_graph(
 
     system_prompt: who Friday is and what it must not claim (sent first to the LLM).
     llm_suffix: optional text appended to the user's sentence (kept for old callers).
-    classifier: the trained router. Left out, it is the shared model when FRIDAY_ROUTER_MODEL
-        is on, otherwise None (rules + LLM only). Pass None to force it off.
+    classifier: the trained router. Left out, it is the shared model unless FRIDAY_ROUTER_MODEL=0
+        (then None: rules + LLM only). Pass None to force it off.
     """
     if classifier is _UNSET:
         classifier = get_default_classifier()
