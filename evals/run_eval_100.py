@@ -29,7 +29,21 @@ One sample per row: LLM answers vary between runs, so read the replies, not just
 
 Run: set PYTHONPATH=.  then  python evals\\run_eval_100.py --label before
 Writes evals/results/eval_100_<label>.json and .md. Refuses to overwrite an existing label.
-Exit code is 0 whatever the scores are (only a bad command line or a label clash exits non-zero).
+Exit code is 0 whatever the scores are. Non-zero only for a bad command line, a label clash, a
+bad expected_effect cell, or rows that have no effect spec (exit 2, see below).
+
+expected_effect (optional CSV column): what a correct assistant leaves in the database. eval_100
+rows use the hand-written tables below; any other CSV must give a spec for every row that saves
+or removes something. Clauses are separated by ";", items inside a clause by "|":
+  unchanged                      lists and reminders end exactly as setup left them
+  list:<name>=<item>|<item>      the FULL final contents of that list ("list:x=" means empty)
+  rem:<due>|<text>               exactly one pending reminder; <due> is a local time in the fixed
+                                 zone, e.g. 2026-10-17T10:20, or "any"; <text> is a lowercase
+                                 substring of the saved text
+A row with list: clauses but no rem: clause must leave reminders unchanged, and the other way round.
+Outside eval_100.csv, a row with no spec whose reply sounds state-changing (or whose database
+changed) gets the status no_effect_spec: it is never silently treated as "unchanged", is not
+counted as a pass or a fail, and makes the run exit 2.
 """
 
 from __future__ import annotations
@@ -78,9 +92,15 @@ NOW = datetime(2026, 10, 17, 10, 0, tzinfo=timezone(timedelta(hours=5, minutes=3
 STUB_REPLY = "(stub reply)"
 NOT_CHECKED = "not_checked_offline"
 RUNNER_ERROR = "runner_error"
+NO_EFFECT_SPEC = "no_effect_spec"
 LIVE_HOSTS = frozenset({"api.groq.com", "generativelanguage.googleapis.com"})
 PAUSE_S = 1.0  # between live LLM calls, to be gentle with rate limits
 MAX_RUNNER_ERRORS = 3  # in a row, then the run stops
+# Wording of a reply that says something was saved or removed. Used only to notice a row that
+# needs an effect spec but has none.
+_CHANGE_WORDING = re.compile(
+    r"\b(?:added|removed|deleted|noted|remind you|alarm set|timer set)\b", re.IGNORECASE
+)
 _READ_COMMAND = re.compile(
     r"(?:(?:can|could) you |please )?(?:read\b|keep reading|continue reading|carry on reading)"
 )
@@ -418,24 +438,89 @@ def snapshot_reminders(conn) -> list[tuple[datetime, str]]:
     return [(r["due_at"], r["text"]) for r in db.pending_reminders(conn)]
 
 
-def check_effect(row_id, lists_before, lists_after, rem_before, rem_after) -> tuple[bool, str]:
-    """Did the database end up the way a correct assistant would leave it?"""
-    want_lists = EXPECTED_LISTS.get(row_id, lists_before)
+def parse_effect(spec: str) -> dict:
+    """Parse an expected_effect cell. Raises ValueError with the reason if it is malformed.
+
+    Returns {"lists": None | {list: [items]}, "reminder": None | (due or None for any, needle)}.
+    None for lists or reminder means "must be unchanged".
+    """
+    spec = spec.strip()
+    if spec == "unchanged":
+        return {"lists": None, "reminder": None}
+    lists: dict[str, list[str]] | None = None
+    reminder = None
+    for clause in (c.strip() for c in spec.split(";")):
+        kind, _, body = clause.partition(":")
+        if kind == "list":
+            name, eq, items = body.partition("=")
+            key = _list_key(name.strip().lower())
+            if not eq or not key:
+                raise ValueError(f"bad list clause {clause!r}, want list:<name>=<item>|<item>")
+            lists = {} if lists is None else lists
+            if key in lists:
+                raise ValueError(f"list {key!r} given twice")
+            lists[key] = [i.strip() for i in items.split("|") if i.strip()]
+        elif kind == "rem":
+            due_text, bar, needle = body.partition("|")
+            if not bar or not needle.strip():
+                raise ValueError(f"bad rem clause {clause!r}, want rem:<due>|<text>")
+            if reminder is not None:
+                raise ValueError("only one rem clause is allowed")
+            due = None
+            if due_text.strip() != "any":
+                try:
+                    due = datetime.fromisoformat(due_text.strip())
+                except ValueError as exc:
+                    raise ValueError(f"bad due time {due_text!r}: {exc}") from exc
+                if due.tzinfo is not None:
+                    raise ValueError(f"due time {due_text!r} must not carry a zone")
+                due = due.replace(tzinfo=NOW.tzinfo)
+            reminder = (due, needle.strip().lower())
+        else:
+            raise ValueError(f"unknown clause {clause!r}")
+    return {"lists": {k: v for k, v in (lists or {}).items() if v} if lists is not None else None,
+            "reminder": reminder}
+
+
+def builtin_effect(row_id: str) -> dict | None:
+    """The hand-written expectation for an eval_100 row, in the same form parse_effect returns."""
+    if row_id not in EXPECTED_LISTS and row_id not in EXPECTED_REMINDERS:
+        return None
+    return {"lists": EXPECTED_LISTS.get(row_id), "reminder": EXPECTED_REMINDERS.get(row_id)}
+
+
+def check_effect(
+    row_id, lists_before, lists_after, rem_before, rem_after, spec: dict | None = None
+) -> tuple[bool, str]:
+    """Did the database end up the way a correct assistant would leave it?
+
+    The built-in table wins, then the row's parsed expected_effect, then "nothing changes".
+    """
+    effect = builtin_effect(row_id) or spec or {"lists": None, "reminder": None}
+    want_lists = lists_before if effect["lists"] is None else effect["lists"]
     if lists_after != want_lists:
         return False, f"lists: wanted {want_lists}, found {lists_after}"
-    if row_id in EXPECTED_REMINDERS:
-        due, needle = EXPECTED_REMINDERS[row_id]
+    if effect["reminder"] is not None:
+        due, needle = effect["reminder"]
         if len(rem_after) != 1:
             return False, f"reminders: wanted 1 saved, found {len(rem_after)}"
         saved_due, saved_text = rem_after[0]
-        if saved_due != due:
+        if due is not None and saved_due != due:
             return False, f"reminder due {saved_due.isoformat()}, wanted {due.isoformat()}"
         if needle not in saved_text.lower():
             return False, f"reminder text {saved_text!r} lacks {needle!r}"
         return True, "reminder saved"
     if rem_after != rem_before:
         return False, f"reminders: wanted none saved, found {len(rem_after)}"
-    return True, "lists changed as expected" if row_id in EXPECTED_LISTS else "nothing saved"
+    return True, "lists changed as expected" if effect["lists"] is not None else "nothing saved"
+
+
+def lacks_effect_spec(row, spec, changed, routed, reply) -> bool:
+    """A row that needs an effect spec (not eval_100) but has none, and may have saved something."""
+    if not row.get("effect_required") or spec is not None or builtin_effect(row["id"]):
+        return False
+    claims = routed in ("lists", "reminders") and _CHANGE_WORDING.search(reply) is not None
+    return changed or claims
 
 
 def is_docs_content(row: dict) -> bool:
@@ -506,9 +591,12 @@ def run_row(row: dict, classifier, probe: Probe | None = None) -> dict:
             ms = round((time.perf_counter() - start) * 1000)
             lists_after, rem_after = snapshot_lists(conn), snapshot_reminders(conn)
             traces = db.get_traces(conn, state["run_id"])
+            spec_text = row.get("expected_effect", "").strip()
+            spec = parse_effect(spec_text) if spec_text else None
             effect_ok, effect_detail = check_effect(
-                row["id"], lists_before, lists_after, rem_before, rem_after
+                row["id"], lists_before, lists_after, rem_before, rem_after, spec
             )
+            changed = lists_after != lists_before or rem_after != rem_before
         finally:
             conn.close()
     if probe:
@@ -518,6 +606,9 @@ def run_row(row: dict, classifier, probe: Probe | None = None) -> dict:
     router_trace = next((t["output"] for t in traces if t["step"] == "router"), "")
     routing_ok = routed == row["expected_skill"]
     result_ok = None if row["expected_skill"] == "llm" else check_reply(row["expected_result"], reply)
+    no_spec = lacks_effect_spec(row, spec, changed, routed, reply)
+    if no_spec:  # the default "unchanged" check above means nothing for this row
+        effect_ok, effect_detail = True, "no effect spec"
     setup_ok = all(item["ok"] for item in setup_log)
     runner_errors = (probe.errors if probe else []) + (
         [{"kind": "blocked_host", "type": "NetworkGuard", "status": None}]
@@ -528,6 +619,8 @@ def run_row(row: dict, classifier, probe: Probe | None = None) -> dict:
         status = RUNNER_ERROR
     elif not live and is_docs_content(row):
         status = NOT_CHECKED
+    elif no_spec:
+        status = NO_EFFECT_SPEC
     elif routing_ok and result_ok is not False and effect_ok and setup_ok:
         status = "pass"
     else:
@@ -597,6 +690,7 @@ def summarize(rows: list[dict]) -> dict:
         "checked": tally(checked),
         "runner_errors": sum(r["status"] == RUNNER_ERROR for r in rows),
         "not_checked_offline": sum(r["status"] == NOT_CHECKED for r in rows),
+        "no_effect_spec": sum(r["status"] == NO_EFFECT_SPEC for r in rows),
         "by_skill": by_skill,
         "by_notes": by_notes,
         "llm": {
@@ -680,6 +774,9 @@ def write_reports(args, rows: list[dict], summary: dict, meta: dict) -> tuple[Pa
             f"Runner errors: {summary['runner_errors']}."
         ),
         f"- Not checked offline (not counted as passes): {summary['not_checked_offline']}.",
+        (
+            f"- No effect spec (not passed, not failed; fix the CSV): {summary['no_effect_spec']}."
+        ),
         "",
         "## Per skill (checked rows only)",
         "",
@@ -729,6 +826,18 @@ def write_reports(args, rows: list[dict], summary: dict, meta: dict) -> tuple[Pa
             if r["blocked_hosts"]:
                 detail += f", blocked: {', '.join(sorted(set(r['blocked_hosts'])))}"
             lines.append(f"| {r['id']} | {_cell(r['text'])} | {err['kind']} | {_cell(detail)} |")
+    lines += [
+        "",
+        "## Rows with no effect spec (not in the totals; add expected_effect to the CSV)",
+        "",
+        "| Id | Text | Routed | Reply |",
+        "|---|---|---|---|",
+    ]
+    for r in rows:
+        if r["status"] == NO_EFFECT_SPEC:
+            lines.append(
+                f"| {r['id']} | {_cell(r['text'])} | {r['routed']} | {_cell(r['reply'])} |"
+            )
     if not live:
         lines += [
             "",
@@ -798,7 +907,17 @@ def read_rows(path: Path) -> list[dict]:
     ids = [r["id"] for r in rows]
     if len(ids) != len(set(ids)):
         raise SystemExit(f"{path.name}: duplicate ids")
+    effect_required = path.resolve() != CSV_PATH.resolve()
     for r in rows:
+        r.setdefault("expected_effect", "")
+        r["effect_required"] = effect_required
+        if r["expected_effect"].strip():
+            if builtin_effect(r["id"]):
+                raise SystemExit(f"{path.name}: {r['id']} has an expected_effect and a built-in one")
+            try:
+                parse_effect(r["expected_effect"])
+            except ValueError as exc:
+                raise SystemExit(f"{path.name}: {r['id']} has a bad expected_effect: {exc}") from exc
         if r["expected_result"].partition(":")[0] not in ("exact", "has", "re", "any"):
             raise SystemExit(f"{path.name}: {r['id']} has a bad expected_result prefix")
     return rows
@@ -889,6 +1008,10 @@ def main() -> None:
         f"not checked offline: {summary['not_checked_offline']}"
     )
     print(f"Wrote {md_path}\nWrote {json_path}")
+    if summary["no_effect_spec"]:
+        ids = ", ".join(r["id"] for r in done if r["status"] == NO_EFFECT_SPEC)
+        print(f"\nWARNING: {summary['no_effect_spec']} rows have no effect spec: {ids}")
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
