@@ -73,7 +73,7 @@ MUS-06,music,Pause the music,,music,exact:Paused.,exact
 MUS-07,music,Resume the music,,music,exact:Resuming.,exact
 MUS-08,music,Skip this song,,music,exact:Skipping.,exact
 MUS-09,music,Go back a song,,music,exact:Going back.,exact
-MUS-10,music,Decrease the volume,,music,"re:^Volume \d{1,3} percent\.$",known problem
+MUS-10,music,Make it a little quieter please,,music,"re:^Volume \d{1,3} percent\.$",natural
 MUS-11,music,Turn the volume up,,music,"re:^Volume \d{1,3} percent\.$",exact
 MUS-12,music,Set the volume to fifty percent,,music,exact:Volume 50 percent.,natural
 MUS-13,music,"It's too loud, turn it down",,music,"re:^Volume \d{1,3} percent\.$",natural
