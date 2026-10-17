@@ -1,0 +1,31 @@
+id,skill,text,setup,expected_skill,expected_result,notes,expected_effect
+HLD2-01,lists,add eggs to my grocery list,,lists,"exact:Okay, I added eggs to your grocery list.",heldout2,list:grocery=eggs
+HLD2-02,lists,what all is on my shopping list,Add milk to my shopping list|Add bread to my shopping list,lists,exact:On your shopping list: milk and bread.,heldout2,unchanged
+HLD2-03,lists,remove milk from the grocery list,Add milk to my grocery list|Add eggs to my grocery list,lists,"exact:Okay, I removed milk from your grocery list.",heldout2,list:grocery=eggs
+HLD2-04,lists,put call mom on my to-do list,,lists,"re:(?i)^Okay, I added call mom to your to[- ]?do list\.$",heldout2,list:todo=call mom
+HLD2-05,lists,add sunscreen and a towel to my packing list,,lists,"re:^Okay, I added sunscreen and (a )?towel to your packing list\.$",heldout2,list:packing=sunscreen|towel
+HLD2-06,lists,make a note that the meeting moved to friday,,lists,"exact:Okay, noted: the meeting moved to friday.",heldout2,list:notes=the meeting moved to friday
+HLD2-07,reminders,remind me to call the bank at three thirty,,reminders,"exact:Okay, I'll remind you to call the bank at 3:30 PM.",heldout2,rem:2026-10-17T15:30|call the bank
+HLD2-08,reminders,set a timer for fifteen minutes,,reminders,"exact:Okay, timer set for 15 minutes.",heldout2,rem:2026-10-17T10:15|timer
+HLD2-09,reminders,wake me up at six tomorrow,,reminders,"exact:Okay, alarm set for tomorrow at 6 AM.",heldout2,rem:2026-10-18T06:00|alarm
+HLD2-10,reminders,remind me in two hours to take out the trash,,reminders,"exact:Okay, I'll remind you to take out the trash in 2 hours.",heldout2,rem:2026-10-17T12:00|take out the trash
+HLD2-11,reminders,set an alarm for nine pm,,reminders,"exact:Okay, alarm set for 9 PM.",heldout2,rem:2026-10-17T21:00|alarm
+HLD2-12,reminders,remind me to submit the form tomorrow at nine am,,reminders,"exact:Okay, I'll remind you to submit the form tomorrow at 9 AM.",heldout2,rem:2026-10-18T09:00|submit the form
+HLD2-13,music,play some Arijit Singh,,music,re:^Playing .+\.$,heldout2,unchanged
+HLD2-14,music,play the song Kesariya,,music,re:^Playing .+\.$,heldout2,unchanged
+HLD2-15,music,pause this for a bit,,music,exact:Paused.,heldout2,unchanged
+HLD2-16,music,play the next track,,music,exact:Skipping.,heldout2,unchanged
+HLD2-17,music,make it louder,,music,"re:^Volume \d{1,3} percent\.$",heldout2,unchanged
+HLD2-18,music,put the volume at forty percent,,music,exact:Volume 40 percent.,heldout2,unchanged
+HLD2-19,music,stop playing the song,,music,exact:Paused.,heldout2,unchanged
+HLD2-20,clock,which day of the week is it,,clock,"re:^Today is Saturday(, 17 October 2026)?\.$",heldout2,unchanged
+HLD2-21,clock,what's the time now,,clock,exact:It is 10:00 AM.,heldout2,unchanged
+HLD2-22,clock,tell me today's date,,clock,"exact:Today is Saturday, 17 October 2026.",heldout2,unchanged
+HLD2-23,calc,what is 45 plus 67,,calc,exact:The answer is 112.,heldout2,unchanged
+HLD2-24,calc,what's fifteen percent of 80,,calc,exact:The answer is 12.,heldout2,unchanged
+HLD2-25,calc,what is 144 divided by 12,,calc,exact:The answer is 12.,heldout2,unchanged
+HLD2-26,calc,what's nine squared,,calc,exact:The answer is 81.,heldout2,unchanged
+HLD2-27,chat,explain what an API is in simple words,,llm,any:,heldout2,unchanged
+HLD2-28,chat,give me a tip for a job interview,,llm,any:,heldout2,unchanged
+HLD2-29,chat,what's a good name for a pet dog,,llm,any:,heldout2,unchanged
+HLD2-30,chat,why is the ocean salty,,llm,any:,heldout2,unchanged
