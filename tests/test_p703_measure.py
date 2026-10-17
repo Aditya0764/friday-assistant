@@ -2,10 +2,13 @@
 
 import importlib.util
 import io
+import json
+import re
 import wave
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -167,13 +170,26 @@ def test_timed_turn_setup_runs_untimed_and_llm_failure_is_recorded(runner):
     assert len(got["llm_calls"]) == 1
 
 
+def fake_decode(path, seconds=1.0):
+    """Stands in for friday.voice.decode: a 16 kHz float32 array."""
+    return np.zeros(int(16000 * seconds), dtype=np.float32)
+
+
 class FakeSTT:
+    """Like Friday's SpeechToText in the pinned stack: a path is NOT acceptable here, because
+    faster-whisper's own file reader crashes with PyAV 19. Only arrays may arrive."""
+
     def __init__(self, text="add eggs to my grocery list"):
         self.text = text
         self.seen = []
+        self.types = []
 
     def transcribe(self, audio, vad=False):
+        if isinstance(audio, (str, Path)):
+            raise TypeError("open() got an unexpected keyword argument 'metadata_errors'")
+        assert isinstance(audio, np.ndarray) and audio.dtype == np.float32
         self.seen.append(vad)
+        self.types.append(type(audio))
         return SimpleNamespace(text=self.text, ms=1)
 
 
@@ -190,17 +206,21 @@ def test_full_turn_times_the_whole_chain_with_vad_on(runner):
     stt, tts = FakeSTT(), FakeTTS()
     tick = iter(range(0, 1000, 10))  # fake clock: every read is 10 s later
     rec = p703.full_turn(runner, Path("clip.wav"), "off", None, stub_llm(runner),
-                         runner.stub_embed, stt, tts, clock=lambda: next(tick))
-    assert stt.seen == [True] and len(tts.texts) == 1 and tts.texts[0]
+                         runner.stub_embed, stt, tts, clock=lambda: next(tick),
+                         decode=fake_decode)
+    assert stt.seen == [True] and stt.types == [np.ndarray]  # the array, never the path
+    assert len(tts.texts) == 1 and tts.texts[0]
     assert rec["status"] == "ok"
-    assert rec["stt_ms"] == 10_000 and rec["graph_ms"] == 10_000 and rec["tts_ms"] == 10_000
-    assert rec["total_ms"] == 30_000  # one timer, not a sum of the parts
+    assert rec["decode_ms"] == 10_000  # decoding is its own part ...
+    assert rec["stt_ms"] == 10_000  # ... and the STT part is transcribe() only
+    assert rec["graph_ms"] == 10_000 and rec["tts_ms"] == 10_000
+    assert rec["total_ms"] == 40_000  # one timer that includes the decoding
     assert "clip.wav" not in repr(rec)
 
 
 def test_full_turn_empty_transcript_and_error(runner):
     empty = p703.full_turn(runner, Path("c.wav"), "on", None, stub_llm(runner),
-                           runner.stub_embed, FakeSTT(""), FakeTTS())
+                           runner.stub_embed, FakeSTT(""), FakeTTS(), decode=fake_decode)
     assert empty["status"] == "empty_transcript" and "total_ms" not in empty
 
     class BadSTT:
@@ -208,7 +228,7 @@ def test_full_turn_empty_transcript_and_error(runner):
             raise RuntimeError("decode")
 
     bad = p703.full_turn(runner, Path("c.wav"), "on", None, stub_llm(runner),
-                         runner.stub_embed, BadSTT(), FakeTTS())
+                         runner.stub_embed, BadSTT(), FakeTTS(), decode=fake_decode)
     assert bad["status"] == "error" and bad["error"]["type"] == "RuntimeError"
 
 
@@ -259,8 +279,16 @@ def test_find_clips_and_stt_stage_keep_only_numbers(tmp_path):
     assert len(clips) == 2
     stt = FakeSTT("private words said by the user")
     clock = iter(x / 10 for x in range(1000))  # each pair of reads is 0.1 s apart
-    out = p703.run_stt_stage(stt, clips, repeats=2, clock=lambda: next(clock))
-    assert out["clips"] == 2 and len(out["timings_ms"]) == 4
+    decoded = []
+
+    def decode(path):
+        decoded.append(path)
+        return fake_decode(path)
+
+    out = p703.run_stt_stage(stt, clips, repeats=2, clock=lambda: next(clock), decode=decode)
+    assert decoded == clips and stt.types == [np.ndarray] * 5  # warm-up + 2 clips x 2
+    assert out["clips"] == 2 and out["decoded"] == 2 and out["decode_errors"] == 0
+    assert len(out["timings_ms"]) == 4
     assert out["timings_ms"][0] == pytest.approx(100)
     assert out["lengths"] == [1.0, 1.0] and all(stt.seen)
     assert "secret_name" not in repr(out) and "private words" not in repr(out)
@@ -392,11 +420,12 @@ def make_data(peak_mib=5000):
         "text_turns": turns,
         "router": {"cold": [{"ready_s": 4.5, "error": ""}], "forward": [10.0, 20.0],
                    "forward_texts": 2, "forward_repeats": 1},
-        "stt": {"clips": 2, "lengths": [1.0, 3.0], "timings_ms": [800.0, 1200.0],
+        "stt": {"clips": 2, "decoded": 2, "decode_errors": 0, "lengths": [1.0, 3.0], "timings_ms": [800.0, 1200.0],
                 "rtf": [0.8, 0.4], "repeats": 1, "empty_transcripts": 0, "errors": 0},
         "tts": {"items": [{"id": "B", "chars": 40, "ms": [300.0], "audio_s": 2.5}],
                 "repeats": 1, "errors": 0},
         "full": [{"mode": "off", "status": "ok", "total_ms": 3333.0, "stt_ms": 900.0,
+                  "decode_ms": 80.0,
                   "graph_ms": 1500.0, "tts_ms": 400.0, "error": None},
                  {"mode": "on", "status": "empty_transcript", "error": None}],
         "stages": [{"name": "Whisper base.en", "ms": 1500.0, "error": "", "rss": 700 * mb,
@@ -486,3 +515,90 @@ def test_report_verdict_a_above_and_not_above_and_no_recommendation():
     text = p703.build_report(data)
     assert "Rule (a): mean added = 0.100 s, n = 5, threshold 0.5 s: NOT ABOVE" in text
     assert "turn the router" not in text.lower() and "recommend" not in text.lower()
+
+
+# ---------- STT gets arrays, never paths ----------
+
+
+def test_stt_stage_decodes_first_and_times_only_transcribe():
+    calls = []
+    clock = iter(range(0, 10_000, 1))  # +1 s per read
+
+    def decode(path):
+        calls.append("decode")
+        return fake_decode(path, 2.0)
+
+    class Stt(FakeSTT):
+        def transcribe(self, audio, vad=False):
+            calls.append("transcribe")
+            return super().transcribe(audio, vad)
+
+    out = p703.run_stt_stage(Stt(), [Path("a.wav")], repeats=1, clock=lambda: next(clock),
+                             decode=decode)
+    assert calls == ["decode", "transcribe", "transcribe"]  # decode once, warm-up, timed run
+    assert out["timings_ms"] == [1000.0]  # two clock reads around transcribe only
+    assert out["lengths"] == [2.0] and out["rtf"] == [0.5]
+
+
+def test_stt_stage_counts_clips_that_fail_to_decode():
+    def decode(path):
+        if path.name == "bad.wav":
+            raise ValueError("no audio")
+        return fake_decode(path)
+
+    out = p703.run_stt_stage(FakeSTT(), [Path("bad.wav"), Path("ok.wav")], 1, decode=decode)
+    assert out["clips"] == 2 and out["decoded"] == 1 and out["decode_errors"] == 1
+    assert len(out["timings_ms"]) == 1
+
+
+def test_strict_fake_stt_rejects_a_path():
+    with pytest.raises(TypeError):
+        FakeSTT().transcribe("clip.wav", vad=True)
+    with pytest.raises(TypeError):
+        FakeSTT().transcribe(Path("clip.wav"), vad=True)
+
+
+def test_script_never_hands_a_path_to_the_stt():
+    source = (ROOT / "scripts" / "p703_measure.py").read_text(encoding="utf-8")
+    assert "transcribe(clip" not in source and "transcribe(path" not in source
+    first_args = re.findall(r"\.transcribe\((\w+(?:\[\d\])?)", source)
+    assert first_args and set(first_args) <= {"audio", "arrays[0]"}  # arrays only
+
+
+def test_decode_clip_is_friday_decoder_and_returns_16k_float32(tmp_path):
+    clip = tmp_path / "c.wav"
+    clip.write_bytes(wav_bytes(0.5, rate=16000))
+    audio = p703.decode_clip(clip)  # friday.voice.decode.decode_audio_file via PyAV
+    assert audio.dtype == np.float32 and audio.ndim == 1
+    assert abs(len(audio) - 8000) <= 16
+
+
+# ---------- partial file ----------
+
+
+def test_partial_file_written_after_a_stage_without_names_or_transcripts(tmp_path):
+    for sub, name in (("clips", "secret_name_1.wav"), ("clips_x", "secret_name_2.wav")):
+        (tmp_path / sub).mkdir()
+        (tmp_path / sub / name).write_bytes(wav_bytes(1.0))
+    clips = p703.find_clips(tmp_path)
+    data = make_data()
+    data["text_turns"][0]["reply"] = "a reply text that should not be saved"
+    data["stt"] = p703.run_stt_stage(FakeSTT("words the user said"), clips, 1, decode=fake_decode)
+    path = tmp_path / "p703_demo_partial.json"
+    p703.write_partial({**data, "last_stage_done": "STT"}, path)
+    raw = path.read_text(encoding="utf-8")
+    loaded = json.loads(raw)
+    assert loaded["last_stage_done"] == "STT"
+    assert loaded["stt"]["clips"] == 2 and len(loaded["stt"]["timings_ms"]) == 2
+    assert loaded["text_turns"][0]["ms"] == 100  # numbers kept
+    for forbidden in ("secret_name", "words the user said", "a reply text", ".wav"):
+        assert forbidden not in raw
+    assert not (tmp_path / "p703_demo_partial.json.tmp").exists()
+
+
+def test_partial_file_is_overwritten_each_time(tmp_path):
+    path = tmp_path / "p703_demo_partial.json"
+    p703.write_partial({"last_stage_done": "text turns", "x": {1, 2}}, path)
+    p703.write_partial({"last_stage_done": "TTS"}, path)
+    assert json.loads(path.read_text(encoding="utf-8")) == {"last_stage_done": "TTS"}
+    assert [f.name for f in tmp_path.iterdir()] == ["p703_demo_partial.json"]

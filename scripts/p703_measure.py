@@ -11,11 +11,15 @@ What it measures (see the report for n and conditions of each):
   2. Router cost: paired ON-minus-OFF time, cold start of the router model in a fresh process,
      and the model's own forward time.
   3. STT: faster-whisper base.en with Friday's settings (vad=True, like the wake/follow-up
-     path) on the saved clips in data\\clips*. Read only. Only counts and times are reported,
+     path) on the saved clips in data\\clips*. Read only. Each clip is decoded first with
+     friday.voice.decode (as Friday does: faster-whisper's own file reader breaks on PyAV 19)
+     and the float32 array is passed to transcribe; a path is never passed to the STT.
+     Only counts and times are reported,
      never file names or transcripts.
   4. TTS: Piper synthesize_wav (no playback) for the reply texts of step 1.
-  5. Full turn: clip -> STT -> graph -> synthesize_wav, one timer around all of it. No
-     playback, no Bluetooth, WAV ready, not audio start. The parts are never added together.
+  5. Full turn: clip -> decode -> STT -> graph -> synthesize_wav, one timer around all of it
+     (decoding included). No playback, no Bluetooth, WAV ready, not audio start. The parts
+     are never added together.
   6. RAM of this process (psutil) after each load, and the peak during the work.
 
 Network: only api.groq.com and generativelanguage.googleapis.com (same guard as the eval
@@ -73,6 +77,7 @@ BUCKETS = (
 )
 BIG_APPS = ("chrome", "spotify", "msedge", "teams", "whatsapp", "dropbox", "firefox")
 MIB = 1024 * 1024
+SAMPLE_RATE = 16000  # what friday.voice.decode returns
 
 
 def load_runner():
@@ -361,23 +366,38 @@ def wav_seconds(source) -> float | None:
         return None
 
 
-def run_stt_stage(stt, clips: list[Path], repeats: int, clock=time.perf_counter) -> dict:
-    """Transcribe every clip `repeats` times (vad=True) after one discarded warm-up run.
+def decode_clip(path: Path) -> np.ndarray:
+    """Friday's own decoder (friday.voice.decode): 16 kHz mono float32, what stt.transcribe gets."""
+    from friday.voice.decode import decode_audio_file
 
-    Keeps only numbers: no file name and no transcript is stored.
+    return decode_audio_file(path)
+
+
+def run_stt_stage(stt, clips: list[Path], repeats: int, clock=time.perf_counter,
+                  decode=decode_clip) -> dict:
+    """Decode every clip once (untimed), then transcribe the arrays `repeats` times (vad=True).
+
+    Only transcribe() is timed. One discarded warm-up run first. Keeps only numbers: no file
+    name and no transcript is stored.
     """
     if not clips:
         return {"clips": 0}
-    stt.transcribe(clips[0], vad=True)
-    lengths, timings, rtf, empty, errors = [], [], [], 0, 0
+    arrays, decode_errors = [], 0
     for clip in clips:
-        seconds = wav_seconds(clip)
-        if seconds is not None:
-            lengths.append(seconds)
+        try:
+            arrays.append(decode(clip))
+        except Exception:  # noqa: BLE001 - counted, not fatal
+            decode_errors += 1
+    if arrays:
+        stt.transcribe(arrays[0], vad=True)
+    lengths, timings, rtf, empty, errors = [], [], [], 0, 0
+    for audio in arrays:
+        seconds = len(audio) / SAMPLE_RATE
+        lengths.append(seconds)
         for _ in range(repeats):
             start = clock()
             try:
-                heard = stt.transcribe(clip, vad=True)
+                heard = stt.transcribe(audio, vad=True)
             except Exception:  # noqa: BLE001 - recorded, not fatal
                 errors += 1
                 continue
@@ -386,8 +406,9 @@ def run_stt_stage(stt, clips: list[Path], repeats: int, clock=time.perf_counter)
             if seconds:
                 rtf.append(ms / 1000 / seconds)
             empty += not heard.text.strip()
-    return {"clips": len(clips), "lengths": lengths, "timings_ms": timings, "rtf": rtf,
-            "repeats": repeats, "empty_transcripts": empty, "errors": errors}
+    return {"clips": len(clips), "decoded": len(arrays), "decode_errors": decode_errors,
+            "lengths": lengths, "timings_ms": timings, "rtf": rtf, "repeats": repeats,
+            "empty_transcripts": empty, "errors": errors}
 
 
 def run_tts_stage(tts, items: list[tuple[str, str]], repeats: int, clock=time.perf_counter) -> dict:
@@ -413,8 +434,12 @@ def run_tts_stage(tts, items: list[tuple[str, str]], repeats: int, clock=time.pe
 
 
 def full_turn(runner, clip: Path, mode: str, classifier, llm: TimedLLM, embed_fn, stt, tts,
-              clock=time.perf_counter) -> dict:
-    """clip -> STT (vad=True) -> graph -> synthesize_wav under ONE timer. No playback."""
+              clock=time.perf_counter, decode=decode_clip) -> dict:
+    """clip -> decode -> STT (vad=True) -> graph -> synthesize_wav under ONE timer.
+
+    The decoding (friday.voice.decode) is inside the whole-turn timer and is also reported on
+    its own. The STT part is transcribe() only. No playback.
+    """
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         path = Path(tmp) / "full.db"
         conn = db.connect(path)
@@ -425,9 +450,12 @@ def full_turn(runner, clip: Path, mode: str, classifier, llm: TimedLLM, embed_fn
             state: dict = {}
             start = clock()
             try:
-                heard = stt.transcribe(clip, vad=True)
+                audio = decode(clip)
+                t_dec = clock()
+                rec["decode_ms"] = (t_dec - start) * 1000
+                heard = stt.transcribe(audio, vad=True)
                 t1 = clock()
-                rec["stt_ms"] = (t1 - start) * 1000
+                rec["stt_ms"] = (t1 - t_dec) * 1000
                 if not heard.text.strip():
                     rec["status"] = "empty_transcript"
                 else:
@@ -806,8 +834,10 @@ def build_report(d: dict) -> str:
     if s.get("clips"):
         lens = stats(s["lengths"])
         L += [(f"- Clips: {s['clips']} (saved wake/follow-up clips in data\\clips*, read only; "
-              f"{len(s['lengths'])} lengths readable). Repeats per clip: {s['repeats']}, so "
-              f"{len(s['timings_ms'])} timings from {s['clips']} distinct clips."),
+              f"{s['decoded']} decoded, {s['decode_errors']} failed to decode). Repeats per clip: {s['repeats']}, so "
+              f"{len(s['timings_ms'])} timings from {s['decoded']} distinct decoded clips. Each clip is "
+              "decoded once with friday.voice.decode before timing and the float32 array is "
+              "passed to transcribe(), as Friday does; only transcribe() is timed here."),
               f"- Clip length: min {num(lens.get('min'))} s, max {num(lens.get('max'))} s, "
               f"mean {num(lens.get('mean'))} s." if lens["n"] else "- Clip length unavailable.",
               (f"- Empty transcripts: {s['empty_transcripts']} of {len(s['timings_ms'])} timings; "
@@ -842,7 +872,9 @@ def build_report(d: dict) -> str:
     # --- full turn
     L += ["## 5. Full turn: clip -> STT -> graph -> synthesize_wav", "",
           ("**No playback, no Bluetooth, WAV ready, not audio start.** One timer around the "
-          "whole chain, one pass per router mode, real LLM. The parts below are measured inside "
+          "whole chain INCLUDING the decoding of the saved clip (a live turn already has the audio "
+          "array from the microphone, so decoding is extra here), one pass per router mode, real "
+          "LLM. The parts below are measured inside "
           "the same turns and are shown separately: they are not added together here."), ""]
     ft = d.get("full", [])
     if ft:
@@ -855,7 +887,8 @@ def build_report(d: dict) -> str:
                   f"{sum(x['status'] == 'error' for x in mine)} (not in the stats)."), ""]
             if ok:
                 L += [*STAT_HEAD, stat_line("whole turn (one timer)", [x["total_ms"] for x in ok]),
-                      stat_line("part: STT", [x["stt_ms"] for x in ok]),
+                      stat_line("part: decode clip", [x["decode_ms"] for x in ok]),
+                      stat_line("part: STT (transcribe only)", [x["stt_ms"] for x in ok]),
                       stat_line("part: graph", [x["graph_ms"] for x in ok]),
                       stat_line("part: TTS", [x["tts_ms"] for x in ok]), "",
                       p95_note(len(ok)), ""]
@@ -909,6 +942,27 @@ def build_report(d: dict) -> str:
 # ---------- main ----------
 
 
+def sanitize(value):
+    """A JSON-safe copy of the collected numbers. Reply texts are dropped, so the file holds no
+    text from the user's voice and nothing that could contain a key."""
+    if isinstance(value, dict):
+        return {str(k): sanitize(v) for k, v in value.items() if k != "reply"}
+    if isinstance(value, (list, tuple, set)):
+        return [sanitize(v) for v in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def write_partial(data: dict, path: Path) -> Path:
+    """Overwrite `path` with the numbers collected so far (temp file first, then moved over)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(sanitize(data), indent=1), encoding="utf-8")
+    os.replace(tmp, path)
+    return path
+
+
 def output_path(label: str, out_dir: Path) -> Path:
     if not re.fullmatch(r"[A-Za-z0-9_-]+", label):
         raise SystemExit("--label may only use letters, digits, - and _")
@@ -932,6 +986,7 @@ def main() -> None:
     args = parser.parse_args()
     passes, repeats = (1, 1) if args.quick else (args.passes, args.repeats)
     out = output_path(args.label, args.out_dir)
+    partial = DATA / f"p703_{args.label}_partial.json"
 
     import psutil
 
@@ -1017,6 +1072,14 @@ def main() -> None:
     sampler = PeakSampler(mem.rss)
     sampler.start()
 
+    def checkpoint(stage: str) -> None:
+        """Save the numbers so far, so a crash in a later stage loses nothing."""
+        data["ram"] = {"sampled_peak": sampler.peak, "samples": sampler.samples,
+                       "phase_peaks": dict(sampler.phase_peaks),
+                       "peak_wset": mem.snapshot()["peak_wset"]}
+        data["last_stage_done"] = stage
+        write_partial(data, partial)
+
     with sampler.phase("text turns"):
         turns, complete = run_text_stage(
             rows, classifiers, lambda row, clf: timed_turn(runner, row, clf, llm, embed_fn),
@@ -1025,6 +1088,7 @@ def main() -> None:
     if not complete:
         data["complete"] = False
         data["incomplete"].append("text turns stopped after 3 errors in a row")
+    checkpoint("text turns")
 
     with sampler.phase("router forward"):
         texts = [runner.normalize(r["text"]) for r in rows]
@@ -1033,17 +1097,20 @@ def main() -> None:
                                   forward_texts=len(texts), forward_repeats=repeats)
         except RuntimeError as exc:
             print(f"forward time not measured: {exc}")
+    checkpoint("router forward")
 
     stt = objs.get("Whisper base.en")
     tts = objs.get("Piper amy-medium")
     if stt:
         with sampler.phase("STT"):
             data["stt"] = run_stt_stage(stt, clips, repeats)
+        checkpoint("STT")
     if tts:
         first_off = [t for t in turns if t["mode"] == "off" and t["pass_no"] == 1
                      and not t["error"] and t["reply"].strip()]
         with sampler.phase("TTS"):
             data["tts"] = run_tts_stage(tts, [(t["id"], t["reply"]) for t in first_off], repeats)
+        checkpoint("TTS")
     if stt and tts and clips and complete:
         with sampler.phase("full turns"):
             full, ok = run_full_stage(
@@ -1054,6 +1121,7 @@ def main() -> None:
         if not ok:
             data["complete"] = False
             data["incomplete"].append("full turns stopped after 3 errors in a row")
+        checkpoint("full turns")
 
     sampler.stop()
     snap = mem.snapshot()
@@ -1065,7 +1133,7 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("x", encoding="utf-8") as f:
         f.write(text)
-    print(f"Wrote {out}")
+    print(f"Wrote {out}\n(partial numbers file: {partial})")
 
 
 if __name__ == "__main__":
