@@ -1,0 +1,30 @@
+put toothpaste on my shopping list | lists
+I need to add rice and lentils to the grocery list | lists
+what do I have on my packing list | lists
+take bread off my shopping list | lists
+read out my to-do list | lists
+note down that the rent is due on the first | lists
+remind me to drink water in twenty minutes | reminders
+set an alarm for six fifteen tomorrow morning | reminders
+remind me at four thirty to water the plants | reminders
+start a timer for ten minutes | reminders
+can you wake me up at seven | reminders
+ping me in an hour to check the oven | reminders
+play Blinding Lights by The Weeknd | music
+play something chill | music
+pause | music
+next song please | music
+turn the volume down a bit | music
+set volume to seventy | music
+resume the song | music
+what's the date today | clock
+tell me the time please | clock
+what is the time right now | clock
+what's twenty percent of 450 | calc
+how many kilometers is 26 miles | calc
+what is 15 times 18 | calc
+what's the square root of 144 | calc
+what's the difference between a virus and a bacteria | chat
+suggest a good movie for tonight | chat
+how do I stay focused while studying | chat
+tell me something interesting about space | chat
