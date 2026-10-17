@@ -23,7 +23,10 @@ MAX_READ = 10  # longer lists are read in part so Friday does not talk for a min
 MAX_ITEMS_PER_ADD = 10
 DEFAULT_LIST = "main"
 
-_OPENING = r"(?:(?:can|could) you |please |hey friday |friday )?"
+_OPENING = (
+    r"(?:(?:can|could) you |please |hey friday |friday "
+    r"|i (?:need|want|have) to |i'd like to |i would like to )?"
+)
 _NAME = r"[a-z'-]+(?: [a-z'-]+)?"
 _LISTREF = rf"(?: (?:my|the|our|a))?(?: (?P<list>{_NAME}))? list"
 _TAIL = r"(?: please)?"
@@ -33,7 +36,7 @@ _ADD = re.compile(
 )
 _READ = re.compile(
     rf"{_OPENING}(?:what(?:'s| is) (?:on|in)|what do i have (?:on|in)"
-    rf"|(?:read|show|tell|give)(?: me)?(?: what(?:'s| is) on)?(?: me)?){_LISTREF}{_TAIL}"
+    rf"|(?:read(?: out)?|show|tell|give)(?: me)?(?: what(?:'s| is) on)?(?: me)?){_LISTREF}{_TAIL}"
 )
 _REMOVE = re.compile(
     rf"{_OPENING}(?:remove|delete|take|cross) (?P<item>.+?) (?:from|off|off of){_LISTREF}{_TAIL}"
@@ -43,7 +46,7 @@ _NOTE = re.compile(
     rf"(?: that| to| of)? (?P<item>.+?){_TAIL}"
 )
 _NOTES_READ = re.compile(
-    rf"{_OPENING}(?:what are|read|show|tell|give)(?: me)?(?: my| the)? notes{_TAIL}"
+    rf"{_OPENING}(?:what are|read(?: out)?|show|tell|give)(?: me)?(?: my| the)? notes{_TAIL}"
 )
 
 

@@ -6,6 +6,9 @@
 "At 6" with no AM or PM means the NEXT time the clock shows 6, whichever of AM or PM
 comes first. "Tomorrow at 6" with no AM or PM uses a daytime guess (7 to 11 = AM,
 12 = noon, 1 to 6 = PM). The confirmation always says the full time back.
+"Wake me up at 7" means 7 AM (the next one) unless a PM or a part of the day is said.
+"Set an alarm for 6 15 tomorrow morning": a part of the day (morning, afternoon, evening, night)
+settles AM or PM when none is said.
 Not supported yet: repeating reminders, listing or cancelling reminders, dates beyond
 tomorrow, "half an hour".
 """
@@ -18,30 +21,39 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from friday.skills.base import Skill
-from friday.skills.calc import words_to_digits
+from friday.skills.calc import _NUMBER_WORDS, words_to_digits
 
 MAX_DAYS = 30
 
 _HOUR_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
                "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12}  # fmt: skip
-_MINUTE_WORDS = {"fifteen": "15", "thirty": "30", "forty five": "45"}
+_MINUTE_WORDS = {"ten": "10", "fifteen": "15", "twenty": "20", "twenty five": "25",
+                 "thirty": "30", "thirty five": "35", "forty": "40", "forty five": "45",
+                 "fifty": "50", "fifty five": "55"}  # fmt: skip
+_UNIT = r"(?:seconds?|secs?|minutes?|mins?|hours?|hrs?)"
+# "at six thirty" / "for six fifteen": an hour word 1-12, then a minute word. Only after "at" or
+# "for", and not when a digit, another number word or a unit follows ("for six fifteen minutes",
+# "at one thirty five"): there the number-word step keeps its old reading.
 _SPOKEN_CLOCK = re.compile(
-    rf"\b(?P<h>{'|'.join(_HOUR_WORDS)}) (?P<m>{'|'.join(_MINUTE_WORDS)})(?= ?(?:am|pm|a m|p m)\b)"
+    rf"(?:(?<=\bat )|(?<=\bfor ))(?P<h>{'|'.join(_HOUR_WORDS)}) "
+    rf"(?P<m>{'|'.join(sorted(_MINUTE_WORDS, key=len, reverse=True))})"
+    rf"(?! (?:\d|{'|'.join(sorted(_NUMBER_WORDS))}|{_UNIT})\b)\b"
 )
 
 
 def _spoken_clock(text: str) -> str:
-    """'six thirty pm' -> '6 30 pm' (otherwise the number-word step would read it as 36)."""
+    """'at six thirty' -> 'at 6 30' (otherwise the number-word step would read it as 36)."""
     return _SPOKEN_CLOCK.sub(lambda m: f"{_HOUR_WORDS[m['h']]} {_MINUTE_WORDS[m['m']]}", text)
+
 
 _UNIT_SECONDS = {"second": 1, "sec": 1, "minute": 60, "min": 60, "hour": 3600, "hr": 3600}
 _UNIT_NAMES = {"second": "second", "sec": "second", "minute": "minute", "min": "minute",
                "hour": "hour", "hr": "hour"}  # fmt: skip
-_UNIT = r"(?:seconds?|secs?|minutes?|mins?|hours?|hrs?)"
 _CLOCK = r"\d{1,2}(?:\s\d{2})?(?:\s?(?:am|pm|a m|p m))?"
 _WHEN = rf"(?P<when>(?:tomorrow\s+)?at\s+{_CLOCK}|in\s+\d+\s*{_UNIT})"
 _OPENING = r"(?:(?:can|could) you |please |hey friday |friday )?"
-_START = r"(?:set a reminder|remind me|reminder)"
+_START = r"(?:set a reminder|remind me|ping me|reminder)"
+_DAYPART = r"(?:in the |at )?(?P<part>morning|afternoon|evening|night)"
 
 _REMINDER_WHEN_FIRST = re.compile(
     rf"{_OPENING}{_START}\s+{_WHEN}\s+(?:to|that|about)\s+(?P<task>.+)"
@@ -55,7 +67,13 @@ _TIMER_ALT = re.compile(
 )
 _ALARM = re.compile(
     rf"{_OPENING}set (?:an |a )?alarm (?:for |at )(?P<tomorrow>tomorrow\s+)?(?:at\s+)?(?P<clock>{_CLOCK})"
+    rf"(?P<tomorrow2>\s+tomorrow)?(?:\s+{_DAYPART})?"
 )
+_WAKE = re.compile(
+    rf"{_OPENING}wake me(?: up)?(?P<tomorrow>\s+tomorrow)?(?:\s+(?:at|for))?\s+(?P<clock>{_CLOCK})"
+    rf"(?P<tomorrow2>\s+tomorrow)?(?:\s+{_DAYPART})?"
+)
+_WAKE_IN = re.compile(rf"{_OPENING}wake me(?: up)? in\s+(?P<n>\d+)\s*(?P<unit>{_UNIT})")
 _CLOCK_PARTS = re.compile(r"(?P<h>\d{1,2})(?:\s(?P<m>\d{2}))?(?:\s?(?P<ap>am|pm|a m|p m))?")
 
 
@@ -127,6 +145,26 @@ def _when_due(when: str, now: datetime) -> tuple[datetime, str] | None:
     return due, f"{day}at {_time_text(due)}"
 
 
+def _alarm_request(match: re.Match, now: datetime, wake: bool) -> Request | None:
+    """An alarm at a clock time. A part of the day settles AM/PM; after "wake me" a bare hour is AM."""
+    clock = match["clock"]
+    parts = _CLOCK_PARTS.fullmatch(clock)
+    if parts is None:
+        return None
+    hour = int(parts["h"])
+    if not parts["ap"] and 1 <= hour <= 12:
+        if match["part"]:
+            clock += " am" if match["part"] == "morning" else " pm"
+        elif wake and hour < 12:
+            clock += " am"
+    tomorrow = "tomorrow " if (match["tomorrow"] or match["tomorrow2"]) else ""
+    result = _when_due(f"{tomorrow}at {clock}", now)
+    if result is None:
+        return None
+    due, phrase = result
+    return Request("Your alarm is going off.", due, f"Okay, alarm set for {phrase.removeprefix('at ')}.")
+
+
 def _you(task: str) -> str:
     """Flip the pronouns so the reminder reads right when Friday says it back."""
     task = re.sub(r"\bmy\b", "your", task.removesuffix(" please").strip())
@@ -151,13 +189,24 @@ def parse_request(clean: str, now: datetime) -> Request | None:
             confirmation=f"Okay, timer set for {count} {name}.",
         )
 
+    wake_in = _WAKE_IN.fullmatch(text)
+    if wake_in:
+        count, unit = int(wake_in["n"]), wake_in["unit"].rstrip("s")
+        seconds = count * _UNIT_SECONDS[unit]
+        if count < 1 or seconds > MAX_DAYS * 86400:
+            return None
+        name = _UNIT_NAMES[unit] + ("" if count == 1 else "s")
+        return Request(
+            "Your alarm is going off.", now + timedelta(seconds=seconds),
+            f"Okay, alarm set for {count} {name}.",
+        )
+
     alarm = _ALARM.fullmatch(text)
     if alarm:
-        result = _when_due(f"{alarm['tomorrow'] or ''}at {alarm['clock']}", now)
-        if result is None:
-            return None
-        due, phrase = result
-        return Request("Your alarm is going off.", due, f"Okay, alarm set for {phrase.removeprefix('at ')}.")
+        return _alarm_request(alarm, now, wake=False)
+    wake = _WAKE.fullmatch(text)
+    if wake:
+        return _alarm_request(wake, now, wake=True)
 
     reminder = _REMINDER_WHEN_FIRST.fullmatch(text) or _REMINDER_TASK_FIRST.fullmatch(text)
     if reminder:

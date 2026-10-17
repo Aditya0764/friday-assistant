@@ -148,3 +148,28 @@ def test_other_sentences_are_not_caught(sentence):
 
 def test_music_guard_is_off_without_music():
     assert not CatchSkill(reminders=False, music=False).can_handle("the music")
+
+
+
+@pytest.mark.parametrize(
+    ("sentence", "value"),
+    [
+        ("turn the volume down a bit", -1),
+        ("turn it up a little", 1),
+        ("lower the volume slightly", -1),
+        ("bring the music volume down a little bit", -1),
+        ("raise the volume a bit", 1),
+        ("please turn it down a bit", -1),
+    ],
+)
+def test_volume_direction_with_a_trailing_softener(sentence, value):
+    assert parse_command(sentence) == Command("volume_change", value=value)
+
+
+@pytest.mark.parametrize("sentence", ["volume to 30 a bit", "mute a bit", "tell me a bit"])
+def test_softener_does_not_unlock_other_volume_commands(sentence):
+    assert parse_command(sentence) is None
+
+
+def test_softener_does_not_touch_play():
+    assert parse_command("play down a bit").kind == "play"

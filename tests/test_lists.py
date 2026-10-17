@@ -2,7 +2,7 @@ import pytest
 
 from friday import db
 from friday.router.router import Router, normalize
-from friday.skills.lists import ListsSkill, parse_action
+from friday.skills.lists import Action, ListsSkill, parse_action
 from friday.skills.registry import build_registry
 
 
@@ -194,3 +194,24 @@ def test_router_sends_lists_to_the_lists_skill_not_math(tmp_path):
 
 def test_registry_has_the_lists_skill(tmp_path):
     assert "lists" in build_registry(db_path=tmp_path / "t.db").names()
+
+
+
+@pytest.mark.parametrize(
+    ("sentence", "action"),
+    [
+        ("I need to add rice and lentils to the grocery list", Action("add", "grocery", ("rice", "lentils"))),
+        ("I'd like to put batteries on the hardware list", Action("add", "hardware", ("batteries",))),
+        ("I want to add eggs and flour to my baking list", Action("add", "baking", ("eggs", "flour"))),
+        ("read out the shopping list", Action("read", "shopping")),
+        ("Can you read out my to-do list", Action("read", "todo")),
+        ("read out my notes", Action("read", "notes")),
+    ],
+)
+def test_lead_ins_and_read_out(sentence, action):
+    assert parse_action(normalize(sentence)) == action
+
+
+@pytest.mark.parametrize("sentence", ["I need to think about my list", "I need to read a book"])
+def test_lead_in_does_not_claim_ordinary_sentences(sentence):
+    assert parse_action(normalize(sentence)) is None

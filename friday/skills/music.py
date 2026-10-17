@@ -55,6 +55,8 @@ _VOLUME_DIR = re.compile(
     r"|^(?:make it )?(?:(?:a bit|a little bit|a little|slightly|much) )?(louder|quieter)$"
 )
 # "it's too loud, turn it down": the complaint only counts when a volume command follows it.
+# "turn the volume down a bit": a trailing softener is dropped before the up/down match only.
+_SOFTENER_END = re.compile(r" (?:a bit|a little bit|a little|slightly)$")
 _COMPLAINT = re.compile(
     r"^(?:it's|it is|that's|that is|this is) (?:(?:a bit|a little|way|much) )?too (?:loud|quiet) "
 )
@@ -83,7 +85,7 @@ def _parse_volume(text: str) -> Command | None:
         return Command("volume_set", value=100)
     if _MUTE.match(text):
         return Command("volume_set", value=0)
-    match = _VOLUME_DIR.match(text)
+    match = _VOLUME_DIR.match(_SOFTENER_END.sub("", text))
     if match:
         word = next(group for group in match.groups() if group)
         return Command("volume_change", value=1 if word in _MORE else -1)
