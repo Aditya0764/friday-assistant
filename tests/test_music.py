@@ -75,9 +75,23 @@ def test_volume_set():
 
 @pytest.mark.parametrize(
     "sentence",
-    ["what time is it", "stop", "play", "tell me a joke", "add milk to my shopping list", "what is 5 plus 5"],
+    ["what time is it", "play", "tell me a joke", "add milk to my shopping list", "what is 5 plus 5"],
 )
 def test_not_music(sentence):
+    assert parse_command(sentence) is None
+
+
+@pytest.mark.parametrize(
+    "sentence", ["stop", "stop it", "stop playing", "please stop", "stop please", "can you stop"]
+)
+def test_bare_stop_pauses(sentence):
+    assert parse_command(sentence) == Command("pause")
+
+
+@pytest.mark.parametrize(
+    "sentence", ["stop the timer", "stop talking", "stop reading", "stop making jokes"]
+)
+def test_stop_with_something_else_is_not_music(sentence):
     assert parse_command(sentence) is None
 
 
@@ -238,3 +252,16 @@ def test_router_sends_play_to_music(tmp_path):
     router = Router(build_registry(None, tmp_path / "t.db", FakePlayer()))
     assert router.route("Play Starboy by The Weeknd.").skill.name == "music"
     assert router.route("Pause the music.").skill.name == "music"
+
+
+def test_router_stop_is_music_only_when_music_is_on(tmp_path):
+    with_music = Router(build_registry(None, tmp_path / "t.db", FakePlayer()))
+    assert with_music.route("Stop.").skill.name == "music"
+    without_music = Router(build_registry(None, tmp_path / "t2.db"))
+    assert without_music.route("Stop.").skill is None
+
+
+def test_stop_pauses_the_player():
+    player = FakePlayer()
+    assert run(MusicSkill(player), "stop") == "Paused."
+    assert player.calls == ["pause"]

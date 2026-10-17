@@ -4,7 +4,10 @@ All the Spotify work lives in friday/spotify_client.py. This file only understan
 sentence and writes a short spoken reply, so it can be tested with a fake player.
 
 Commands are matched on the cleaned sentence (lowercase, punctuation removed).
-'play X by Y' searches Spotify; 'stop' alone is NOT music (it could mean a timer).
+'play X by Y' searches Spotify. A bare 'stop' pauses the music (a timer or alarm is only spoken
+once, so there is nothing ringing to stop).
+Volume commands accept number words ('volume to fifty') and a complaint lead-in ("it's too loud,
+turn it down"). The lead-in only unlocks volume commands, never 'play'.
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ import re
 from dataclasses import dataclass
 
 from friday.skills.base import Skill
+from friday.skills.calc import words_to_digits
 from friday.spotify_client import MusicError
 
 _POLITE_START = re.compile(r"^(?:(?:please|can you|could you|would you|will you) )+")
@@ -22,7 +26,7 @@ _MEDIA = r"(?:music|song|track|spotify|playback)"
 _VW = r"(?:the )?(?:music )?volume"  # 'volume', 'the volume', 'the music volume'
 _MORE = {"up", "increase", "raise", "louder"}  # words meaning 'turn it up'
 
-_PAUSE = re.compile(rf"^pause(?: (?:the )?{_MEDIA})?$|^stop (?:the )?{_MEDIA}$")
+_PAUSE = re.compile(rf"^pause(?: (?:the )?{_MEDIA})?$|^stop (?:the )?{_MEDIA}$|^stop(?: it| playing)?$")
 _RESUME = re.compile(
     rf"^(?:resume|unpause|continue)(?: (?:the )?(?:{_MEDIA}|playing))?$|^play (?:some |the )?music$"
 )
@@ -48,7 +52,11 @@ _VOLUME_DIR = re.compile(
     rf"|^(?:turn|put|bring) (up|down) {_VW}$"
     r"|^(?:turn|put|bring) (?:the music |it |the sound )?(up|down)$"
     rf"|^(increase|raise|decrease|lower|reduce) {_VW}$"
-    r"|^(?:make it |a bit |a little |a little bit )?(louder|quieter)$"
+    r"|^(?:make it )?(?:(?:a bit|a little bit|a little|slightly|much) )?(louder|quieter)$"
+)
+# "it's too loud, turn it down": the complaint only counts when a volume command follows it.
+_COMPLAINT = re.compile(
+    r"^(?:it's|it is|that's|that is|this is) (?:(?:a bit|a little|way|much) )?too (?:loud|quiet) "
 )
 _NOW = re.compile(
     r"^what(?:'s| is) (?:this song|this track|playing|currently playing|the song playing|playing right now)$"
@@ -66,6 +74,22 @@ class Command:
     value: int = 0      # volume_change: +1 or -1; volume_set: percent
 
 
+def _parse_volume(text: str) -> Command | None:
+    # Number words become digits here only, so a title like "seven nation army" is never touched.
+    match = _VOLUME_SET.match(words_to_digits(text))
+    if match:
+        return Command("volume_set", value=int(match.group(1)))
+    if _VOLUME_FULL.match(text):
+        return Command("volume_set", value=100)
+    if _MUTE.match(text):
+        return Command("volume_set", value=0)
+    match = _VOLUME_DIR.match(text)
+    if match:
+        word = next(group for group in match.groups() if group)
+        return Command("volume_change", value=1 if word in _MORE else -1)
+    return None
+
+
 def parse_command(clean: str) -> Command | None:
     text = _POLITE_START.sub("", clean.strip())
     text = _POLITE_END.sub("", text)
@@ -81,17 +105,13 @@ def parse_command(clean: str) -> Command | None:
     if _NOW.match(text):
         return Command("now")
 
-    match = _VOLUME_SET.match(text)
-    if match:
-        return Command("volume_set", value=int(match.group(1)))
-    if _VOLUME_FULL.match(text):
-        return Command("volume_set", value=100)
-    if _MUTE.match(text):
-        return Command("volume_set", value=0)
-    match = _VOLUME_DIR.match(text)
-    if match:
-        word = next(group for group in match.groups() if group)
-        return Command("volume_change", value=1 if word in _MORE else -1)
+    volume = _parse_volume(text)
+    if volume is None:
+        complaint = _COMPLAINT.match(text)
+        if complaint:
+            volume = _parse_volume(_POLITE_START.sub("", text[complaint.end() :]))
+    if volume is not None:
+        return volume
 
     match = _PLAY.match(text)
     if match:
