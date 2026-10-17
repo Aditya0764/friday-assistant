@@ -505,3 +505,92 @@ button {
   background: var(--bad);
   border-color: var(--bad);
 }
+/* ---------- results page ---------- */
+
+.results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 20px;
+  font-size: 0.9rem;
+}
+
+.results h2 {
+  margin: 20px 0 6px;
+  font-size: 1.05rem;
+}
+
+.results h3 {
+  margin: 14px 0 6px;
+  font-size: 0.9rem;
+}
+
+.results .warn {
+  padding: 8px 10px;
+  border-left: 3px solid var(--bad);
+  background: var(--friday-bubble);
+}
+
+.charts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.chart {
+  margin: 0;
+}
+
+.chart svg {
+  width: 260px;
+  height: 120px;
+}
+
+.chart .axis {
+  font-size: 9px;
+  fill: var(--muted);
+}
+
+.chart .line {
+  stroke-width: 2;
+}
+
+.chart .line0,
+.chart .key0 {
+  stroke: var(--accent);
+  color: var(--accent);
+}
+
+.chart .line1,
+.chart .key1 {
+  stroke: var(--ok);
+  color: var(--ok);
+}
+
+.legend {
+  display: flex;
+  gap: 10px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.results-table {
+  border-collapse: collapse;
+  margin: 8px 0;
+}
+
+.results-table th,
+.results-table td {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  text-align: right;
+}
+
+.results-table th:first-child,
+.results-table td:first-child {
+  text-align: left;
+}
+
+.results-table .deployed td {
+  font-weight: 700;
+}

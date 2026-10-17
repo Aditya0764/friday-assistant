@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import DocsPanel from './DocsPanel.jsx'
+import ResultsPanel from './ResultsPanel.jsx'
 import TracePanel from './TracePanel.jsx'
 import { postJson, request } from './api.js'
 import { useRecorder } from './useRecorder.js'
@@ -36,7 +37,7 @@ function Sources({ sources }) {
 }
 
 export default function App() {
-  const [view, setView] = useState('chat') // 'chat' or 'trace'
+  const [view, setView] = useState('chat') // 'chat', 'trace' or 'results'
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false) // a typed message is waiting for its answer
@@ -153,11 +154,20 @@ export default function App() {
             >
               Trace
             </button>
+            <button
+              type="button"
+              className={view === 'results' ? 'tab active' : 'tab'}
+              onClick={() => setView('results')}
+            >
+              Results
+            </button>
           </nav>
         </header>
 
         {view === 'trace' ? (
           <TracePanel />
+        ) : view === 'results' ? (
+          <ResultsPanel />
         ) : (
           <>
             <main className="messages">

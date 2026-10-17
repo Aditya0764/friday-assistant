@@ -1,0 +1,176 @@
+{
+  "generated_by": "scripts/p705_extract.py",
+  "sources": [
+    "training/finetune_results.md",
+    "training/eval_report.md",
+    "training/own_phrasing_results.md"
+  ],
+  "router5": {
+    "model": "models/router_distilbert",
+    "classes": [
+      "lists_notes",
+      "math_time",
+      "music",
+      "other",
+      "timers_reminders"
+    ],
+    "curve": [
+      {
+        "epoch": 1,
+        "train_loss": 0.3949,
+        "dev_acc": 0.9685,
+        "dev_macro_f1": 0.9346,
+        "seconds": 25.5
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.0938,
+        "dev_acc": 0.971,
+        "dev_macro_f1": 0.9395,
+        "seconds": 24.0
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0459,
+        "dev_acc": 0.9739,
+        "dev_macro_f1": 0.9458,
+        "seconds": 24.4
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0199,
+        "dev_acc": 0.9734,
+        "dev_macro_f1": 0.9446,
+        "seconds": 24.8
+      }
+    ],
+    "best_epoch": 3,
+    "test_accuracy": 0.9657,
+    "test_macro_f1": 0.9326,
+    "confusion": [
+      [
+        124,
+        0,
+        0,
+        18,
+        0
+      ],
+      [
+        0,
+        102,
+        0,
+        11,
+        0
+      ],
+      [
+        1,
+        1,
+        202,
+        33,
+        1
+      ],
+      [
+        9,
+        6,
+        15,
+        2256,
+        4
+      ],
+      [
+        0,
+        0,
+        0,
+        3,
+        188
+      ]
+    ],
+    "confusion_total": 2974,
+    "test_rows_stated": 2974
+  },
+  "router6": {
+    "model": "models/router_v2",
+    "deployed_run": "B",
+    "runs": [
+      {
+        "run": "A: MASSIVE only",
+        "own_accuracy": 0.6889,
+        "correct": 62,
+        "total": 90,
+        "own_macro_f1": 0.6652,
+        "doc_qa_correct": 0,
+        "doc_qa_total": 14,
+        "massive_test_acc": 0.9637
+      },
+      {
+        "run": "B: MASSIVE + own x10 (primary)",
+        "own_accuracy": 0.8556,
+        "correct": 77,
+        "total": 90,
+        "own_macro_f1": 0.8676,
+        "doc_qa_correct": 9,
+        "doc_qa_total": 14,
+        "massive_test_acc": 0.9654
+      },
+      {
+        "run": "C: MASSIVE + own x1",
+        "own_accuracy": 0.8111,
+        "correct": 73,
+        "total": 90,
+        "own_macro_f1": 0.8156,
+        "doc_qa_correct": 8,
+        "doc_qa_total": 14,
+        "massive_test_acc": 0.9644
+      }
+    ],
+    "run_b_per_class": [
+      {
+        "class": "doc_qa",
+        "correct": 9,
+        "support": 14,
+        "precision": 1.0,
+        "recall": 0.643,
+        "f1": 0.783
+      },
+      {
+        "class": "lists_notes",
+        "correct": 12,
+        "support": 13,
+        "precision": 0.923,
+        "recall": 0.923,
+        "f1": 0.923
+      },
+      {
+        "class": "math_time",
+        "correct": 14,
+        "support": 18,
+        "precision": 1.0,
+        "recall": 0.778,
+        "f1": 0.875
+      },
+      {
+        "class": "music",
+        "correct": 8,
+        "support": 9,
+        "precision": 1.0,
+        "recall": 0.889,
+        "f1": 0.941
+      },
+      {
+        "class": "other",
+        "correct": 17,
+        "support": 17,
+        "precision": 0.586,
+        "recall": 1.0,
+        "f1": 0.739
+      },
+      {
+        "class": "timers_reminders",
+        "correct": 17,
+        "support": 19,
+        "precision": 1.0,
+        "recall": 0.895,
+        "f1": 0.944
+      }
+    ]
+  }
+}
