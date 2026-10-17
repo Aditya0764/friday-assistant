@@ -1,0 +1,184 @@
+{
+  "entries": {
+    "HLD2-01": {
+      "sha256": "e9a64ecddecc23fb80d03d7c748bb827c81d5e4af6151d1e1b21e4ada3c88b70",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Add x to my grocery list"
+    },
+    "HLD2-02": {
+      "sha256": "7e5959c443b02216da2f34f065ccea21f7eee7e96d97ba02c53c73adec159ac0",
+      "vad": true,
+      "model": "base.en",
+      "heard": "What all is on my shopping list?"
+    },
+    "HLD2-03": {
+      "sha256": "163e7590482229109e631ca66e1a7d598bac943372233bcbaec0e1655eb15ae3",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Remove milk from a glossary list."
+    },
+    "HLD2-04": {
+      "sha256": "6e58b4ad21a9d65c9602973be6c229bc49e95c4ba0124cf4ec1b75804028abfc",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Put call mom on my to-do list"
+    },
+    "HLD2-05": {
+      "sha256": "2b483a68fbdacf6b4a29a55b6555c8b9c4667fb7f4e79796fd7bc6346ef05f5b",
+      "vad": true,
+      "model": "base.en",
+      "heard": "I had sunscreen and it doubled to my packing list."
+    },
+    "HLD2-06": {
+      "sha256": "a5c7f3b0b7e77101805279fed74502bd03126b7d88e9984c68d20cde9e2f63c2",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Make a note that the meeting moved to Friday."
+    },
+    "HLD2-07": {
+      "sha256": "326a37022b61e96c697f821e96c4fab287787a700cf21f8e98f019ccca120c67",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Remind me to call the bank at 330."
+    },
+    "HLD2-08": {
+      "sha256": "1c65835fb92046efe236026779bff365c7b87dc374c71e5ac9e8f61965681478",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Set it MF for 15 minutes."
+    },
+    "HLD2-09": {
+      "sha256": "21500e4b82c95715f44008bfc1a3a85ee95475ea7e529171c76cca8154f77af4",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Wake me up at 6 tomorrow"
+    },
+    "HLD2-10": {
+      "sha256": "d0caafb1b3b50c31a4bf667cf30c956159f1b84bc1f6d6e12d2ffa886b570ae7",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Remind me in two hours to take out the trash."
+    },
+    "HLD2-11": {
+      "sha256": "c43562417479492d366677e5e3363bca5746648c166d7f7f447b08759b931e75",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Set an alarm for 9pm."
+    },
+    "HLD2-12": {
+      "sha256": "1eb467e19e5b7e10d4619ce445a8a91698754a6d57227b39a57bd3a5222910fb",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Remind me to submit the form tomorrow at 9am."
+    },
+    "HLD2-13": {
+      "sha256": "647d99dbb66fd54cfb52132ce2567bbcfb1f9031cb41abb28e9267d7954edfc3",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Play some original notes in the description."
+    },
+    "HLD2-14": {
+      "sha256": "ed0f1bddcaef8798b74e9fa66c3d20633721087f0a69d28591634a4c4677b84d",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Play the song in case area."
+    },
+    "HLD2-15": {
+      "sha256": "c3bbae172ed04de32d71a5e520893f436d2a910b9bc7359d547a2282b7f96ea7",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Pause this for a bit."
+    },
+    "HLD2-16": {
+      "sha256": "a75d3e9b157d4671f769e33f256e7773f33d1389f45462c0ca27c3b5a0ab26b8",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Play the next track"
+    },
+    "HLD2-17": {
+      "sha256": "f538593c60f228801d48b625da0b6e03f2781f0c878ae63ac0354139b9dd4da5",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Make it louder"
+    },
+    "HLD2-18": {
+      "sha256": "9e9471851f4001e0909269b7d66e53ce34cd1368dfe06d345c48683075c8350d",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Put the volume at 40 percent"
+    },
+    "HLD2-19": {
+      "sha256": "810e9801ba4a482f06f3928c41c74fb70bdaa8041772878108fc6a66fede54b4",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Stop playing the song."
+    },
+    "HLD2-20": {
+      "sha256": "475e936fa761fbfb82cb50737b43125eff06e4628ec712cf925616afa7e21aa5",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Which day of the week is it?"
+    },
+    "HLD2-21": {
+      "sha256": "0d6263f52c090f89a4b5784ec9f1bc1d290008f2f61791272f6184c7cf17995b",
+      "vad": true,
+      "model": "base.en",
+      "heard": "What's the time now?"
+    },
+    "HLD2-22": {
+      "sha256": "dbd2101482d1783e3bce4c523fe1e52d958e4dabc9da0f6d45f7745f3495d5a9",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Tell me today's date"
+    },
+    "HLD2-23": {
+      "sha256": "f27e2230dd7ff3552509d068827ebbe12a61bae40b0ccecc0344c6a49fde89b5",
+      "vad": true,
+      "model": "base.en",
+      "heard": "What is 45 to 67?"
+    },
+    "HLD2-24": {
+      "sha256": "264b28b2313146a144892ffc1e83c61d027bcc0825d3116a5054070b9725cbec",
+      "vad": true,
+      "model": "base.en",
+      "heard": "worth 15% of 80%"
+    },
+    "HLD2-25": {
+      "sha256": "537933060d40f0eb6cd2550b092ba8f4cc7aa261ecc317aa6f2cdd7882665074",
+      "vad": true,
+      "model": "base.en",
+      "heard": "What is 144 divided by 12?"
+    },
+    "HLD2-26": {
+      "sha256": "e70eb6ffc5d1ff0f2c7bf6679c8b16e8c99b3ca617f1badeb6c2fd8169745bdb",
+      "vad": true,
+      "model": "base.en",
+      "heard": "What's 9 squared?"
+    },
+    "HLD2-27": {
+      "sha256": "072a8edad8f4032ad957759d5b02b7e62410661bf450c5b608d1f1187a91f882",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Explain what an API is in simple words."
+    },
+    "HLD2-28": {
+      "sha256": "b281c5954aa0b6b4a270efe24c4a9c3fe4d5d315d4bddfa8545e5fae57c272fd",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Give me a tip for a job interview"
+    },
+    "HLD2-29": {
+      "sha256": "ef900e6d4ef3976ca2a135fdadaeac8175e0f34148a2c4d1ce2dfba97c037b49",
+      "vad": true,
+      "model": "base.en",
+      "heard": "What's a good name for a pet dog?"
+    },
+    "HLD2-30": {
+      "sha256": "863d00f0b1d06a4519610eb5883278ccabbfd897ece1e80506c5d4aab3fb6d89",
+      "vad": true,
+      "model": "base.en",
+      "heard": "Why is the ocean salty?"
+    }
+  }
+}
