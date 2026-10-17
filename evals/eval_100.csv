@@ -1,0 +1,101 @@
+id,skill,text,setup,expected_skill,expected_result,notes
+ECH-01,echo,"Repeat after me, good morning",,echo,exact:good morning,exact
+ECH-02,echo,Echo the quick brown fox,,echo,exact:the quick brown fox,exact
+ECH-03,echo,Say after me I am ready,,echo,exact:i am ready,natural
+ECH-04,echo,"Can you repeat after me, testing one two three",,echo,exact:testing one two three,natural
+ECH-05,echo,Please echo hello Friday,,echo,exact:hello friday,natural
+CLK-01,clock,What time is it?,,clock,"re:^It is \d{1,2}:\d{2} (AM|PM)\.$",exact
+CLK-02,clock,What's today's date?,,clock,"re:^Today is [A-Z][a-z]+, \d{1,2} [A-Z][a-z]+ \d{4}\.$",exact
+CLK-03,clock,What day is it?,,clock,"re:^Today is [A-Z][a-z]+, \d{1,2} [A-Z][a-z]+ \d{4}\.$",exact
+CLK-04,clock,Tell me the time,,clock,"re:^It is \d{1,2}:\d{2} (AM|PM)\.$",exact
+CLK-05,clock,Got the time?,,clock,"re:^It is \d{1,2}:\d{2} (AM|PM)\.$",natural
+CLK-06,clock,What's the time and date?,,clock,"re:^It is \d{1,2}:\d{2} (AM|PM)\. Today is [A-Z][a-z]+, \d{1,2} [A-Z][a-z]+ \d{4}\.$",natural
+CLK-07,clock,Do you know what the time is right now,,clock,"re:^It is \d{1,2}:\d{2} (AM|PM)\.$",natural
+CLK-08,clock,Which day of the week is it today,,clock,"re:^Today is [A-Z][a-z]+, \d{1,2} [A-Z][a-z]+ \d{4}\.$",natural
+LST-01,lists,Add bananas to my shopping list,,lists,"exact:Okay, I added bananas to your shopping list.",exact
+LST-02,lists,Add eggs and bread to my grocery list,,lists,"exact:Okay, I added eggs and bread to your grocery list.",exact
+LST-03,lists,Put socks on my packing list,,lists,"exact:Okay, I added socks to your packing list.",exact
+LST-04,lists,Pop eggs onto the groceries list,,lists,"exact:Okay, I added eggs to your groceries list.",natural
+LST-05,lists,Could you add call the dentist to my to do list,,lists,has:call the dentist,natural
+LST-06,lists,What's on my list,Add eggs to my list,lists,exact:On your list: eggs.,known problem
+LST-07,lists,What's on my shopping list?,Add bananas to my shopping list|Add rice to my shopping list,lists,exact:On your shopping list: bananas and rice.,exact
+LST-08,lists,Read me my packing list,Add socks to my packing list,lists,exact:On your packing list: socks.,exact
+LST-09,lists,Tell me what I've got on the gym list,Add towel to my gym list,lists,exact:On your gym list: towel.,natural
+LST-10,lists,Remove bananas from my shopping list,Add bananas to my shopping list|Add rice to my shopping list,lists,"exact:Okay, I removed bananas from your shopping list.",exact
+LST-11,lists,Take rice off the shopping list,Add rice to my shopping list,lists,"exact:Okay, I removed rice from your shopping list.",exact
+LST-12,lists,Scratch the towel from my gym list,Add towel to my gym list,lists,"exact:Okay, I removed towel from your gym list.",natural
+LST-13,lists,Take a note that the demo is on Friday,,lists,"exact:Okay, noted: the demo is on friday.",exact
+LST-14,lists,Read my notes,Take a note buy a charger,lists,exact:Your notes: buy a charger.,exact
+LST-15,lists,Is there anything on my chores list,,lists,exact:Your chores list is empty.,natural
+DOC-01,docs,What does the document say about late fees?,doc:library_rules.txt,docs,re:(?i)100|2 rupees,exact
+DOC-02,docs,"According to the document, how long can I keep a book?",doc:library_rules.txt,docs,re:(?i)21|three weeks,exact
+DOC-03,docs,What does the doc say about wifi?,doc:library_rules.txt,docs,re:(?i)ground floor,exact
+DOC-04,docs,"From the document, when does the library open?",doc:library_rules.txt,docs,re:(?i)9 ?AM|monday,exact
+DOC-05,docs,What does this paper say about Sundays?,doc:library_rules.txt,docs,re:(?i)closed,natural
+DOC-06,docs,Read it to me,doc:library_rules.txt,docs,re:(?s)^Lakeview.*Say keep reading for more\.$,exact
+DOC-07,docs,Read the document to me please,doc:library_rules.txt,docs,re:(?s)^Lakeview.*Say keep reading for more\.$,exact
+DOC-08,docs,Keep reading,doc:library_rules.txt|Read it to me,docs,has:That's the end of the document.,exact
+DOC-09,docs,Continue reading please,doc:library_rules.txt|Read it to me,docs,has:That's the end of the document.,natural
+DOC-10,docs,Can you tell me what's in the document about the reading room,doc:library_rules.txt,docs,re:(?i)second floor|40|silence,natural
+DOC-11,docs,What does the document say about parking?,doc:library_rules.txt,docs,exact:That's not in the document.,exact
+DOC-12,docs,Read it to me,,docs,exact:I don't have a document yet. Paste one in first.,exact
+CAL-01,calc,What's 15% of 800?,,calc,exact:The answer is 120.,exact
+CAL-02,calc,Five plus three,,calc,exact:The answer is 8.,exact
+CAL-03,calc,What is 12 times 12,,calc,exact:The answer is 144.,exact
+CAL-04,calc,Square root of 81,,calc,exact:The answer is 9.,exact
+CAL-05,calc,Convert 10 miles to kilometers,,calc,exact:10 miles is 16.09 kilometers.,exact
+CAL-06,calc,How many seconds are in 3 minutes,,calc,exact:3 minutes is 180 seconds.,exact
+CAL-07,calc,98.6 degrees Fahrenheit in Celsius,,calc,exact:98.6 degrees Fahrenheit is 37 degrees Celsius.,exact
+CAL-08,calc,Twenty five percent of two hundred,,calc,exact:The answer is 50.,natural
+CAL-09,calc,What's 7 squared,,calc,exact:The answer is 49.,exact
+CAL-10,calc,Divide 144 by 12,,calc,exact:The answer is 12.,natural
+REM-01,reminders,Remind me at 5 pm to buy bread,,reminders,"re:^Okay, I'll remind you to buy bread (tomorrow )?at 5 PM\.$",exact
+REM-02,reminders,Remind me to stretch in 10 minutes,,reminders,"exact:Okay, I'll remind you to stretch in 10 minutes.",exact
+REM-03,reminders,Remind me tomorrow at 9 am to submit the report,,reminders,"exact:Okay, I'll remind you to submit the report tomorrow at 9 AM.",exact
+REM-04,reminders,Set a timer for 5 minutes,,reminders,"exact:Okay, timer set for 5 minutes.",exact
+REM-05,reminders,Start a 20 minute timer,,reminders,"exact:Okay, timer set for 20 minutes.",exact
+REM-06,reminders,Set a timer for an hour,,reminders,"exact:Okay, timer set for 1 hour.",natural
+REM-07,reminders,Set an alarm for 6 30 am,,reminders,"re:^Okay, alarm set for (tomorrow at )?6:30 AM\.$",exact
+REM-08,reminders,Set an alarm for tomorrow at 7 am,,reminders,"exact:Okay, alarm set for tomorrow at 7 AM.",exact
+REM-09,reminders,Give me a heads up at 8 pm to take my vitamins,,reminders,"re:^Okay, I'll remind you to take your vitamins (tomorrow )?at 8 PM\.$",natural
+REM-10,reminders,Wake me at 5 45 am,,reminders,"re:^Okay, alarm set for (tomorrow at )?5:45 AM\.$",natural
+REM-11,reminders,Remind me to call the bank in an hour,,reminders,"exact:Okay, I'll remind you to call the bank in 1 hour.",natural
+REM-12,reminders,Can you remind me at 3 pm that the parcel arrives,,reminders,"re:^Okay, I'll remind you .*(tomorrow )?at 3 PM\.$",natural
+REM-13,reminders,Set a reminder to take out the trash at 8 pm,,reminders,"re:^Okay, I'll remind you to take out the trash (tomorrow )?at 8 PM\.$",exact
+REM-14,reminders,Timer for two minutes,,reminders,"exact:Okay, timer set for 2 minutes.",natural
+REM-15,reminders,Remind me to message Priya in 45 minutes,,reminders,"exact:Okay, I'll remind you to message priya in 45 minutes.",exact
+MUS-01,music,Play Shape of You by Ed Sheeran,,music,re:^Playing .+\.$,exact
+MUS-02,music,Play some jazz,,music,re:^Playing .+\.$,exact
+MUS-03,music,Put on Believer by Imagine Dragons,,music,re:^Playing .+\.$,natural
+MUS-04,music,decrease volume to 50,,music,exact:Volume 50 percent.,known problem
+MUS-05,music,stop,,music,exact:Paused.,known problem
+MUS-06,music,Pause the music,,music,exact:Paused.,exact
+MUS-07,music,Resume the music,,music,exact:Resuming.,exact
+MUS-08,music,Skip this song,,music,exact:Skipping.,exact
+MUS-09,music,Go back a song,,music,exact:Going back.,exact
+MUS-10,music,Decrease the volume,,music,"re:^Volume \d{1,3} percent\.$",known problem
+MUS-11,music,Turn the volume up,,music,"re:^Volume \d{1,3} percent\.$",exact
+MUS-12,music,Set the volume to fifty percent,,music,exact:Volume 50 percent.,natural
+MUS-13,music,"It's too loud, turn it down",,music,"re:^Volume \d{1,3} percent\.$",natural
+MUS-14,music,Mute,,music,exact:Volume 0 percent.,exact
+MUS-15,music,Could you play the next track,,music,exact:Skipping.,natural
+CHT-01,chat,Explain how a rainbow forms,,llm,any:,exact
+CHT-02,chat,Who wrote Pride and Prejudice?,,llm,any:,exact
+CHT-03,chat,What's a good name for a pet goldfish?,,llm,any:,exact
+CHT-04,chat,Give me three tips for a job interview,,llm,any:,exact
+CHT-05,chat,Why is the sky blue?,,llm,any:,exact
+CHT-06,chat,"Thanks, that was helpful",,llm,any:,exact
+CHT-07,chat,How are you feeling today?,,llm,any:,exact
+CHT-08,chat,What is the capital of Australia?,,llm,any:,exact
+CHT-09,chat,Can you help me organise my shopping list?,,llm,any:,known problem
+CHT-10,chat,I love this song,,llm,any:,known problem
+CHT-11,chat,What's a good way to remember names?,,llm,any:,exact
+CHT-12,chat,Tell me a joke about cats,,llm,any:,exact
+SAF-01,safety,Echo,,echo,exact:You didn't say anything to repeat.,exact
+SAF-02,safety,What's 5 divided by 0,,calc,exact:I can't divide by zero.,exact
+SAF-03,safety,What's 2 to the power of 500,,calc,exact:That number is too big for me.,exact
+SAF-04,safety,Remind me at 25 to call mom,,catch,"exact:Sorry, I didn't catch that. Please say it again.",exact
+SAF-05,safety,Set a timer for 0 minutes,,catch,"exact:Sorry, I didn't catch that. Please say it again.",exact
+SAF-06,safety,Add to my list,,catch,"exact:Sorry, I didn't catch that. Please say it again.",exact
+SAF-07,safety,What time is it in Tokyo?,,llm,any:,known problem
+SAF-08,safety,Delete everything on my shopping list,Add milk to my shopping list,catch,any:,exact
