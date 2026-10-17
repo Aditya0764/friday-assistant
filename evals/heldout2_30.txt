@@ -1,25 +1,25 @@
 add eggs to my grocery list
-what's on my shopping list
+what all is on my shopping list
 remove milk from the grocery list
 put call mom on my to-do list
-clear my packing list
+add sunscreen and a towel to my packing list
 make a note that the meeting moved to friday
 remind me to call the bank at three thirty
 set a timer for fifteen minutes
 wake me up at six tomorrow
 remind me in two hours to take out the trash
 set an alarm for nine pm
-remind me tomorrow morning to submit the form
+remind me to submit the form tomorrow at nine am
 play some Arijit Singh
 play the song Kesariya
-pause the music
-skip this song
+pause this for a bit
+play the next track
 make it louder
-set the volume to fifty percent
-stop the music
-what day is it today
-what time is it
-what's today's date
+put the volume at forty percent
+stop playing the song
+which day of the week is it
+what's the time now
+tell me today's date
 what is 45 plus 67
 what's fifteen percent of 80
 what is 144 divided by 12
@@ -27,4 +27,4 @@ what's nine squared
 explain what an API is in simple words
 give me a tip for a job interview
 what's a good name for a pet dog
-why is the sky blue
+why is the ocean salty
