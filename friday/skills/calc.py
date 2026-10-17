@@ -92,6 +92,7 @@ _LEAD_INS = re.compile(
     r"can you tell me|tell me|please)\s+"
 )
 _WORD_OPERATORS = (
+    (r"\bdivide\s+(\d+(?:\.\d+)?)\s+by\b", r"\1 / "),  # "divide 144 by 12"
     (r"\bto the power of\b", " ** "),
     (r"\bmultiplied by\b", " * "),
     (r"\bdivided by\b", " / "),

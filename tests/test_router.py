@@ -63,6 +63,47 @@ def test_echo_with_nothing_to_repeat_says_so():
     assert route.skill.run(route.args) == "You didn't say anything to repeat."
 
 
+def _echo_reply(sentence):
+    route = Router(build_registry()).route(sentence)
+    assert route.skill is not None, f"{sentence!r} was not claimed by any skill"
+    assert route.skill.name == "echo"
+    return route.skill.run(route.args)
+
+
+@pytest.mark.parametrize(
+    ("sentence", "reply"),
+    [
+        ("Can you repeat after me, testing one two three", "testing one two three"),
+        ("Please echo hello Friday", "hello friday"),
+        ("Could you please echo good morning", "good morning"),
+        ("Friday, repeat after me I am ready", "i am ready"),
+        ("Hey Friday, can you echo hi", "hi"),
+        ("Would you please repeat after me hello", "hello"),
+    ],
+)
+def test_echo_accepts_a_lead_in(sentence, reply):
+    assert _echo_reply(sentence) == reply
+
+
+def test_echo_lead_in_with_nothing_to_repeat_says_so():
+    assert _echo_reply("Please echo") == "You didn't say anything to repeat."
+    assert _echo_reply("Can you repeat after me?") == "You didn't say anything to repeat."
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Say after me I am ready",
+        "I said please echo hello",
+        "Would it echo in the hall",
+        "Can you read my notes",
+    ],
+)
+def test_echo_does_not_take_other_sentences(sentence):
+    route = Router(build_registry()).route(sentence)
+    assert route.skill is None or route.skill.name != "echo"
+
+
 def test_registry_rejects_duplicate_names():
     registry = SkillRegistry()
     registry.register(_Dummy())

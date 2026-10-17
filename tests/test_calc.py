@@ -59,6 +59,44 @@ def test_divide_by_zero_is_a_polite_answer_not_a_crash():
     assert _answer("What is 5 divided by 0?") == ("calc", "I can't divide by zero.")
 
 
+@pytest.mark.parametrize(
+    ("sentence", "expected"),
+    [
+        ("Divide 144 by 12", "The answer is 12."),
+        ("divide 100 by 5", "The answer is 20."),
+        ("Divide 10 by 4", "The answer is 2.5."),
+        ("Please divide 144 by 12", "The answer is 12."),
+        ("Divide one hundred forty four by twelve", "The answer is 12."),
+        ("Divide 7 by 0", "I can't divide by zero."),
+    ],
+)
+def test_divide_x_by_y(sentence, expected):
+    assert _answer(sentence) == ("calc", expected)
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Divide the list",
+        "Divide my reminder",
+        "Divide the cake by 3 people",
+        "Divide 144 by 12 people",
+        "Divide 10 plus 2 by 3",
+        "Divide 6500 among 3 people",
+        "Can you divide 144 by 12",
+    ],
+)
+def test_divide_sentences_that_are_not_a_sum_are_not_claimed(sentence):
+    route = Router(build_registry()).route(sentence)
+    assert route.skill is None or route.skill.name != "calc"
+
+
+def test_divide_inside_a_reminder_is_still_a_reminder():
+    route = Router(build_registry(object())).route("Remind me to divide 144 by 12 at 5 pm")
+    assert route.skill is not None
+    assert route.skill.name == "reminders"
+
+
 def test_huge_numbers_are_refused():
     assert _answer("What is 9 to the power of 99?") == ("calc", "That number is too big for me.")
 
