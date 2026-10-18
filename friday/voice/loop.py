@@ -36,7 +36,7 @@ from friday.scheduler import ReminderScheduler
 from friday.skills.registry import build_registry
 from friday.spotify_client import SpotifyPlayer
 from friday.trace import Tracer
-from friday.voice.audio import DEFAULT_KEY, SAMPLE_RATE, record_while_held
+from friday.voice.audio import DEFAULT_KEY, SAMPLE_RATE, KeyTracker, record_while_held
 from friday.voice.endpoint import CHUNK_SECONDS, MIN_SPEECH_RMS
 from friday.voice.phrase import strip_wake_phrase
 from friday.voice.stt import get_stt
@@ -193,6 +193,8 @@ def run_wake(conn, app, stt, tts, speak_lock) -> None:
     detector = WakeWordDetector()
     save_clips = clips_enabled()
     dry_run = os.environ.get("FRIDAY_WAKE_DRY", "").strip().lower() in ("1", "true", "yes", "on")
+    key = KeyTracker(DEFAULT_KEY)  # push-to-talk by key NAME, so left ctrl never counts
+    key.install(keyboard)
 
     def on_audio(audio, source: str) -> bool:
         if dry_run:  # false-trigger counting: hear and log, do nothing else
@@ -223,7 +225,7 @@ def run_wake(conn, app, stt, tts, speak_lock) -> None:
             detector,
             on_audio,
             is_speaking=speak_lock.locked,
-            key_down=lambda: keyboard.is_pressed(DEFAULT_KEY),
+            key_down=key.is_down,
             wake_log=write,
         )
         print(f'Ready. Say "hey friday" (threshold {THRESHOLD}) or hold [{DEFAULT_KEY}].')
@@ -232,7 +234,10 @@ def run_wake(conn, app, stt, tts, speak_lock) -> None:
             print("DRY RUN: wakes are logged only. Nothing is transcribed, answered or spoken.")
         if save_clips:
             print("Saving each command's audio to data\\clips\\ (debug).")
-        listener.run()
+        try:
+            listener.run()
+        finally:
+            key.close(keyboard)
 
 
 def main() -> None:

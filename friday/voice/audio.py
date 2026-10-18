@@ -19,6 +19,8 @@ SAMPLE_RATE = 16000
 DEFAULT_KEY = "right ctrl"  # change this if you prefer another key, e.g. "f9"
 POLL_SECONDS = 0.01
 KEY_LOG = Path("data") / "key_events.log"  # one line per recording: what started it
+MAX_HOLD_SECONDS = 60.0  # a key is never "held" longer than this, whatever the hook says
+GRACE_SECONDS = 0.25  # right after a key-down, the library's own key table may lag behind
 
 
 @dataclass(frozen=True)
@@ -81,6 +83,92 @@ def _write_key_log(short: str, detail: str | None = None) -> None:
         pass
 
 
+class KeyTracker:
+    """Is the push-to-talk key held? Tracked from keyboard-hook events BY NAME.
+
+    keyboard.is_pressed("right ctrl") is also True for the LEFT ctrl key (both are scan code 29),
+    so Ctrl+C or Ctrl+V used to start a recording. Left ctrl events are named 'ctrl' and right
+    ctrl events 'right ctrl': only a down event with exactly this key's name counts.
+
+    A lost key-up (lock screen, UAC, remote desktop...) would leave the key "held" forever, so
+    is_down() also lets go when: (1) any later up event for the key arrives; (2) the library's
+    own table says no ctrl at all is held (it is a superset of this key, so False means this key
+    is surely up), checked after GRACE_SECONDS because the table can lag the event by a moment;
+    (3) MAX_HOLD_SECONDS have passed since the key went down."""
+
+    def __init__(self, key=DEFAULT_KEY, lib_pressed=None, clock=time.monotonic, on_event=None):
+        self.key = key.lower()
+        self._lib_pressed = lib_pressed
+        self._clock = clock
+        self._on_event = on_event  # (event_type, name, scan_code), sees every event first
+        self._lock = threading.Lock()
+        self._since: float | None = None  # when the key went down; None = up
+        self.hooked = False
+        self._hook = None
+
+    def handle(self, event_type: str, name: str | None, scan_code: int = 0) -> None:
+        if self._on_event:
+            self._on_event(event_type, name, scan_code)
+        if (name or "").lower() != self.key:
+            return
+        with self._lock:
+            if event_type == "down":
+                if self._since is None:  # key auto-repeat sends more downs: keep the first time
+                    self._since = self._clock()
+            else:
+                self._since = None
+
+    def install(self, keyboard) -> bool:
+        """Start listening. If the hook cannot be installed, say so and fall back loudly."""
+        self._lib_pressed = keyboard.is_pressed
+        try:
+            self._hook = keyboard.hook(lambda e: self.handle(e.event_type, e.name, e.scan_code))
+            self.hooked = True
+        except Exception as exc:  # noqa: BLE001 - any hook failure means the same fallback
+            self.hooked = False
+            _warn_no_hook(self.key, exc)
+        return self.hooked
+
+    def close(self, keyboard) -> None:
+        if self._hook is not None:
+            keyboard.unhook(self._hook)
+            self._hook = None
+
+    def _lib_says_pressed(self) -> bool:
+        try:
+            return bool(self._lib_pressed(self.key)) if self._lib_pressed else True
+        except Exception:  # noqa: BLE001 - a failing check must not hide a real key press
+            return True
+
+    def is_down(self) -> bool:
+        if not self.hooked:  # fallback: the old behaviour, which also reacts to left ctrl
+            return self._lib_says_pressed() if self._lib_pressed else False
+        with self._lock:
+            since = self._since
+            if since is None:
+                return False
+            age = self._clock() - since
+            if age > MAX_HOLD_SECONDS or (age > GRACE_SECONDS and not self._lib_says_pressed()):
+                self._since = None  # lost key-up: let go
+                return False
+            return True
+
+
+_warned_no_hook = False
+
+
+def _warn_no_hook(key: str, exc: Exception) -> None:
+    global _warned_no_hook
+    if _warned_no_hook:
+        return
+    _warned_no_hook = True
+    print(
+        f"WARNING: could not install the keyboard hook ({exc}). Falling back to "
+        f"keyboard.is_pressed({key!r}), which is ALSO true for the LEFT ctrl key: "
+        "Ctrl+C or Ctrl+V can start a recording."
+    )
+
+
 def record_while_held(key: str = DEFAULT_KEY, device: int | str | None = None) -> Capture:
     """Block until `key` is pressed, record until it is released, return the audio."""
     import keyboard
@@ -90,14 +178,13 @@ def record_while_held(key: str = DEFAULT_KEY, device: int | str | None = None) -
     recording = threading.Event()
     events: deque[tuple] = deque(maxlen=6)  # the last MODIFIER key events the hook saw
 
-    def on_key(event) -> None:
-        note_key(events, event.event_type, event.name, event.scan_code)
+    tracker = KeyTracker(key, on_event=lambda t, n, c: note_key(events, t, n, c))
 
     def on_audio(indata, _frame_count, _time_info, _status) -> None:
         if recording.is_set():
             blocks.append(indata[:, 0].copy())
 
-    hook = keyboard.hook(on_key)
+    tracker.install(keyboard)
     try:
         # The stream is already running while we wait, so the first syllable is not clipped.
         with sd.InputStream(
@@ -107,19 +194,19 @@ def record_while_held(key: str = DEFAULT_KEY, device: int | str | None = None) -
             device=device,
             callback=on_audio,
         ):
-            while not keyboard.is_pressed(key):
+            while not tracker.is_down():
                 time.sleep(POLL_SECONDS)
             recording.set()
             started = time.monotonic()
             _write_key_log(
                 f"key-start ({key})", describe_key_start(key, list(events), started)
             )
-            while keyboard.is_pressed(key):
+            while tracker.is_down():
                 time.sleep(POLL_SECONDS)
             recording.clear()
             _write_key_log(f"key-end held {time.monotonic() - started:.2f}s")
     finally:
-        keyboard.unhook(hook)
+        tracker.close(keyboard)
 
     if not blocks:
         return Capture(audio=np.zeros(0, dtype=np.float32), seconds=0.0, peak=0.0)
