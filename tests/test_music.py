@@ -144,8 +144,8 @@ def test_replies():
     assert run(skill, "resume") == "Resuming."
     assert run(skill, "skip") == "Skipping."
     assert run(skill, "previous song") == "Going back."
-    assert run(skill, "volume up") == "Volume 60 percent."
-    assert run(skill, "set volume to 40") == "Volume 40 percent."
+    assert run(skill, "volume up") == "Spotify volume 60 percent."
+    assert run(skill, "set volume to 40") == "Spotify volume 40 percent."
     assert run(skill, "what's playing") == "Starboy by The Weeknd."
     assert player.calls[0] == ("play", "starboy", "", "")
 

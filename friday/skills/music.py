@@ -166,8 +166,8 @@ class MusicSkill(Skill):
             player.previous()
             return "Going back."
         if command.kind == "volume_change":
-            return f"Volume {player.change_volume(command.value)} percent."
+            return f"Spotify volume {player.change_volume(command.value)} percent."
         if command.kind == "volume_set":
-            return f"Volume {player.set_volume(command.value)} percent."
+            return f"Spotify volume {player.set_volume(command.value)} percent."
         playing = player.now_playing()
         return f"{playing}." if playing else "Nothing is playing."

@@ -201,6 +201,7 @@ Create a bot with Telegram's BotFather, put the token in `.env`, send the bot a 
 - **Whisper mishears names and numbers.** In the spoken set, "eggs" was heard as "x" and "grocery" as "glossary", and two music requests played the wrong song (see `docs/p704_spoken_by_eye.md`).
 - **One speaker, one microphone, one room, one laptop.** Other voices, rooms and machines are untested.
 - **No approval flow yet.** The approval step exists in the graph and is tested, but no skill uses it, and there is no way to approve by voice, dashboard or Telegram.
+- **Volume commands change Spotify's volume, not the laptop's system volume.**
 - **Windows only.**
 - **RAM of the full stack is not measured** (API, dashboard and voice together).
 - **Router misses:** in the own-phrasing test all 4 unit-conversion lines and 5 of 14 document questions that avoid the word "document" were wrong (`training/own_phrasing_results.md`).
