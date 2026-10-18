@@ -38,7 +38,7 @@ from friday.spotify_client import SpotifyPlayer
 from friday.trace import Tracer
 from friday.voice.audio import DEFAULT_KEY, SAMPLE_RATE, KeyTracker, record_while_held
 from friday.voice.endpoint import CHUNK_SECONDS, MIN_SPEECH_RMS
-from friday.voice.phrase import strip_wake_phrase
+from friday.voice.phrase import strip_wake_phrase, words_after_cut
 from friday.voice.stt import get_stt
 from friday.voice.tts import get_tts
 
@@ -56,6 +56,7 @@ HALLUCINATIONS = frozenset(
     {"you", "thank you", "thanks", "thanks for watching", "thank you for watching", "bye",
      "bye bye"}
 )  # what Whisper tends to invent from silence; a real "thank you" is NOT dropped if loud enough
+WAKE_CUT_MARGIN_S = 0.2  # a starting guess: words ending before pre-roll + this are wake words
 CHUNK_SAMPLES = round(SAMPLE_RATE * CHUNK_SECONDS)  # 1280
 
 
@@ -92,6 +93,17 @@ def load_history(conn) -> list[dict]:
     return history
 
 
+def _stt_stats(heard) -> str:
+    """Whisper's own confidence numbers, for the trace only. Nothing is dropped on them."""
+    if heard.no_speech_range is None or heard.avg_logprob_range is None:
+        return ""
+    (n_lo, n_hi), (p_lo, p_hi) = heard.no_speech_range, heard.avg_logprob_range
+    return (
+        f" [no_speech_prob min {n_lo:.3f} max {n_hi:.3f},"
+        f" avg_logprob min {p_lo:.3f} max {p_hi:.3f}]"
+    )
+
+
 def process_capture(
     conn,
     app,
@@ -103,8 +115,10 @@ def process_capture(
     speak_lock: AbstractContextManager | None = None,
     source: str = "key",
     started: float | None = None,
+    preroll_s: float | None = None,
 ) -> bool:
-    """Everything after recording: STT, graph, save, TTS. Returns False if the clip was ignored."""
+    """Everything after recording: STT, graph, save, TTS. Returns False if the clip was ignored.
+    preroll_s: seconds of audio before the wake fired at the start of the clip (wake turns only)."""
     speak_lock = speak_lock or nullcontext()
     started = time.perf_counter() if started is None else started  # start of the timing below
 
@@ -121,9 +135,13 @@ def process_capture(
         print(f"Not enough speech ({loud} loud chunks), ignored.")
         return False
 
+    cut_wake = source == "wake" and preroll_s is not None
     with tracer.step("stt", f"{seconds:.1f} s of audio") as out:
-        heard = stt.transcribe(audio, vad=True)
-        out["output"] = heard.text
+        if cut_wake:
+            heard = stt.transcribe(audio, vad=True, words=True)
+        else:
+            heard = stt.transcribe(audio, vad=True)
+        out["output"] = heard.text + _stt_stats(heard)
     print(f"You: {heard.text!r}  (STT {heard.ms} ms)")
 
     if not heard.text:
@@ -136,7 +154,11 @@ def process_capture(
         return False
 
     text = heard.text
-    if source != "key":  # spoken after the wake word: drop a leading "hey friday"
+    cut = words_after_cut(heard.words, preroll_s + WAKE_CUT_MARGIN_S) if cut_wake else None
+    if cut is not None:  # wake turn with word times: drop what was said before the wake point
+        text = cut
+        print(f"    (words before the wake point removed: {text!r})")
+    elif source != "key":  # no word times, or a follow-up: drop a leading "hey friday"
         text = strip_wake_phrase(text)
         if text != heard.text:
             print(f"    (wake phrase removed: {text!r})")
@@ -196,7 +218,7 @@ def run_wake(conn, app, stt, tts, speak_lock) -> None:
     key = KeyTracker(DEFAULT_KEY)  # push-to-talk by key NAME, so left ctrl never counts
     key.install(keyboard)
 
-    def on_audio(audio, source: str) -> bool:
+    def on_audio(audio, source: str, preroll_s: float | None = None) -> bool:
         if dry_run:  # false-trigger counting: hear and log, do nothing else
             print(f"    (dry run: {source} heard, nothing processed)")
             return False
@@ -208,7 +230,9 @@ def run_wake(conn, app, stt, tts, speak_lock) -> None:
         samples = audio.astype(np.float32) / 32768.0
         seconds = len(samples) / SAMPLE_RATE
         peak = float(np.abs(samples).max()) if len(samples) else 0.0
-        return process_capture(conn, app, stt, tts, samples, seconds, peak, speak_lock, source)
+        return process_capture(
+            conn, app, stt, tts, samples, seconds, peak, speak_lock, source, preroll_s=preroll_s
+        )
 
     WAKE_LOG.parent.mkdir(exist_ok=True)
     is_new = not WAKE_LOG.exists()

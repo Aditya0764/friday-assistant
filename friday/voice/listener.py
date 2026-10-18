@@ -35,7 +35,7 @@ class Listener:
         self,
         mic,
         detector,
-        on_audio: Callable[[np.ndarray, str], bool],
+        on_audio: Callable[[np.ndarray, str, float | None], bool],
         is_speaking: Callable[[], bool],
         key_down: Callable[[], bool],
         wake_log: Callable[[str], None] | None = None,
@@ -43,7 +43,7 @@ class Listener:
     ) -> None:
         self.mic = mic
         self.detector = detector
-        self.on_audio = on_audio  # (int16 audio, source) -> True if a reply was spoken
+        self.on_audio = on_audio  # (int16 audio, source, preroll_s) -> True if a reply was spoken
         self.is_speaking = is_speaking
         self.key_down = key_down
         self.wake_log = wake_log
@@ -88,9 +88,9 @@ class Listener:
         self._preroll.clear()
         self._discard(TAIL_CHUNKS)
 
-    def _handle(self, audio: np.ndarray, source: str) -> bool:
+    def _handle(self, audio: np.ndarray, source: str, preroll_s: float | None = None) -> bool:
         try:
-            return bool(self.on_audio(audio, source))
+            return bool(self.on_audio(audio, source, preroll_s))
         except Exception as exc:  # noqa: BLE001 - one bad turn must not stop the listener
             print(f"Turn failed: {exc}")
             return False
@@ -138,7 +138,7 @@ class Listener:
                 return [chunk]
         return None
 
-    def _conversation(self, audio: np.ndarray | None) -> None:
+    def _conversation(self, audio: np.ndarray | None, preroll_s: float | None = None) -> None:
         if audio is None:
             # Nobody spoke after the wake. Start fresh, so a "hey friday" said right now is not
             # blocked by the cooldown of the wake that just ended.
@@ -147,7 +147,7 @@ class Listener:
             return
         source = "wake"
         while audio is not None:
-            handled = self._handle(audio, source)
+            handled = self._handle(audio, source, preroll_s if source == "wake" else None)
             self._after_reply()
             if not handled:
                 return
@@ -193,4 +193,5 @@ class Listener:
             if fired:
                 self.wake_events += 1
                 print(f">>> WAKE (score {score:.2f}). Listening...")
-                self._conversation(self._record_command([], list(self._preroll)))
+                lead = list(self._preroll)  # the pre-roll as it is at the moment the wake fires
+                self._conversation(self._record_command([], lead), len(lead) * CHUNK_SECONDS)

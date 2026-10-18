@@ -69,12 +69,13 @@ class Clock:
 
 
 def _run(chunks, speaking=(), keys=(), fail_first=False, rows=None, clock=None, detector=None):
-    mic, calls = FakeMic(chunks), []
+    mic, calls, prerolls = FakeMic(chunks), [], []
     detector = detector or FakeDetector()
     speaking, keys = list(speaking), list(keys)
 
-    def on_audio(audio, source):
+    def on_audio(audio, source, preroll_s):
         calls.append((source, len(audio) // CHUNK))
+        prerolls.append(preroll_s)
         if fail_first and len(calls) == 1:
             raise RuntimeError("boom")
         return True
@@ -89,6 +90,7 @@ def _run(chunks, speaking=(), keys=(), fail_first=False, rows=None, clock=None, 
         wake_log=rows.append if rows is not None else None,
         **extra,
     )
+    listener.prerolls = prerolls  # what each on_audio call was told about the pre-roll
     listener.run(should_stop=lambda: mic.empty)
     return listener, calls, detector
 
@@ -98,6 +100,17 @@ def test_wake_then_command_then_quiet_runs_one_turn():
     listener, calls, _ = _run(chunks)
     assert calls == [("wake", 4 + 17)]  # 4 pre-roll chunks + the command
     assert listener.wake_events == 1
+
+
+def test_the_real_preroll_length_goes_to_the_wake_turn_and_none_to_the_follow_up():
+    chunks = (
+        _c(QUIET, 3) + _c(WAKE) + _c(LOUD, 3) + _c(QUIET, 12)  # 3 quiet + the firing chunk = 4
+        + _c(QUIET, TAIL_CHUNKS)
+        + _c(LOUD, 3) + _c(QUIET, 12)
+    )
+    listener, calls, _ = _run(chunks)
+    assert [c[0] for c in calls] == ["wake", "follow_up"]
+    assert listener.prerolls == [4 * 0.08, None]  # shorter than full: the real length, not 1.52
 
 
 def test_follow_up_without_the_wake_word():

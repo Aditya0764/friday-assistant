@@ -22,6 +22,9 @@ class STTResult:
     text: str
     model: str
     ms: int
+    words: tuple[tuple[str, float, float], ...] | None = None  # (word, start s, end s)
+    no_speech_range: tuple[float, float] | None = None  # (min, max) over the segments
+    avg_logprob_range: tuple[float, float] | None = None
 
 
 class SpeechToText:
@@ -35,21 +38,41 @@ class SpeechToText:
         self._model = WhisperModel(model_name, device="cpu", compute_type="int8")
         self.load_ms = int((time.perf_counter() - start) * 1000)
 
-    def transcribe(self, audio: str | Path | np.ndarray, vad: bool = False) -> STTResult:
+    def transcribe(
+        self, audio: str | Path | np.ndarray, vad: bool = False, words: bool = False
+    ) -> STTResult:
         """audio: a wav file path, or a mono float32 array at 16 kHz.
 
         vad=True switches on faster-whisper's built-in speech detector, so clips with no real
-        speech come back as empty text instead of an invented sentence. Off by default."""
+        speech come back as empty text instead of an invented sentence. Off by default.
+        words=True also returns each word with its start and end time (the wake path uses it)."""
         if isinstance(audio, np.ndarray):
             audio = np.ascontiguousarray(audio, dtype=np.float32)
         else:
             audio = str(audio)
 
         start = time.perf_counter()
-        segments, _info = self._model.transcribe(audio, language="en", vad_filter=vad)
+        segments, _info = self._model.transcribe(
+            audio, language="en", vad_filter=vad, word_timestamps=words
+        )
+        segments = list(segments)
         text = " ".join(seg.text.strip() for seg in segments).strip()
         ms = int((time.perf_counter() - start) * 1000)
-        return STTResult(text=text, model=self.model_name, ms=ms)
+        timed = (
+            tuple((w.word, w.start, w.end) for seg in segments for w in (seg.words or ()))
+            if words
+            else None
+        )
+        speech = [seg.no_speech_prob for seg in segments]
+        logprob = [seg.avg_logprob for seg in segments]
+        return STTResult(
+            text=text,
+            model=self.model_name,
+            ms=ms,
+            words=timed,
+            no_speech_range=(min(speech), max(speech)) if segments else None,
+            avg_logprob_range=(min(logprob), max(logprob)) if segments else None,
+        )
 
 
 _stt: SpeechToText | None = None

@@ -20,13 +20,20 @@ def speech(seconds: float, level: float = 0.2) -> np.ndarray:
 
 
 class FakeSTT:
-    def __init__(self, text: str) -> None:
-        self.text, self.calls, self.vads = text, 0, []
+    def __init__(self, text: str, words=None, ranges=None) -> None:
+        self.text, self.calls, self.vads, self.word_flags = text, 0, [], []
+        self.words, self.ranges = words, ranges
 
-    def transcribe(self, audio, vad=False):
+    def transcribe(self, audio, vad=False, words=False):
         self.calls += 1
         self.vads.append(vad)
-        return STTResult(text=self.text, model="fake", ms=1)
+        self.word_flags.append(words)
+        extra = {}
+        if self.ranges:
+            extra = {"no_speech_range": self.ranges[0], "avg_logprob_range": self.ranges[1]}
+        return STTResult(
+            text=self.text, model="fake", ms=1, words=self.words if words else None, **extra
+        )
 
 
 class FakeTTS:
@@ -52,11 +59,13 @@ def conn(tmp_path):
     return db.connect(tmp_path / "t.db")
 
 
-def run(conn, audio, text, source="key"):
-    stt, tts, app = FakeSTT(text), FakeTTS(), FakeApp()
+def run(conn, audio, text, source="key", preroll_s=None, words=None, ranges=None):
+    stt, tts, app = FakeSTT(text, words, ranges), FakeTTS(), FakeApp()
     seconds = len(audio) / SR
     peak = float(np.abs(audio).max()) if len(audio) else 0.0
-    handled = loop.process_capture(conn, app, stt, tts, audio, seconds, peak, source=source)
+    handled = loop.process_capture(
+        conn, app, stt, tts, audio, seconds, peak, source=source, preroll_s=preroll_s
+    )
     return handled, stt, tts, app
 
 
@@ -128,3 +137,58 @@ def test_dropped_turns_are_traced_with_the_reason(conn):
     rows = conn.execute("SELECT step, output FROM traces ORDER BY id").fetchall()
     assert [r["step"] for r in rows] == ["record", "dropped"]
     assert "loud 0" in rows[0]["output"] and "not enough speech" in rows[1]["output"]
+
+
+# ---- wake turns: cut by time (preroll_s), regex only as the fallback ----
+
+HEARD = (
+    (" Hey", 0.1, 0.4), (" Freddy,", 0.4, 0.9), (" play", 1.05, 1.3), (" Blinding", 1.3, 1.7),
+    (" Lights", 1.7, 2.1),
+)
+HEARD_TEXT = "Hey Freddy, play Blinding Lights"
+
+
+def test_wake_turn_cuts_words_before_the_wake_point(conn):
+    handled, stt, _, app = run(conn, speech(0.8), HEARD_TEXT, "wake", 0.8, HEARD)
+    assert handled and app.texts == ["play Blinding Lights"]
+    assert stt.word_flags == [True] and stt.vads == [True]
+
+
+def test_wake_turn_cut_does_not_run_the_regex_on_a_real_leading_friday(conn):
+    words = ((" Hey", 0.1, 0.4), (" Friday", 0.4, 0.9), (" Friday", 1.1, 1.5), (" the", 1.5, 1.6),
+             (" 13th", 1.6, 2.0), (" is", 2.0, 2.1), (" a", 2.1, 2.2), (" movie", 2.2, 2.6))
+    _, _, _, app = run(conn, speech(0.8), "Hey Friday Friday the 13th is a movie", "wake", 0.8, words)
+    assert app.texts == ["Friday the 13th is a movie"]
+
+
+def test_wake_turn_without_word_times_falls_back_to_the_regex(conn):
+    _, _, _, app = run(conn, speech(0.8), "Hey Friday, what time is it?", "wake", 0.8, None)
+    assert app.texts == ["what time is it?"]
+
+
+def test_wake_turn_with_an_empty_cut_falls_back_to_the_regex(conn):
+    words = ((" Hey", 0.1, 0.4), (" Friday,", 0.4, 0.7), (" stop", 0.7, 0.9))
+    _, _, _, app = run(conn, speech(0.8), "Hey Friday, stop", "wake", 0.8, words)
+    assert app.texts == ["stop"]  # the cut left nothing (all words end before 1.0 s)
+
+
+def test_wake_turn_without_preroll_info_uses_the_old_path(conn):
+    _, stt, _, app = run(conn, speech(0.8), "Hey Friday, what time is it?", "wake", None, HEARD)
+    assert app.texts == ["what time is it?"] and stt.word_flags == [False]
+
+
+@pytest.mark.parametrize("source", ["key", "follow_up"])
+def test_key_and_follow_up_never_ask_for_words_or_use_the_cut(conn, source):
+    handled, stt, _, app = run(conn, speech(0.8), "Hey Friday, play Blinding Lights", source,
+                               0.8, HEARD)
+    expected = "Hey Friday, play Blinding Lights" if source == "key" else "play Blinding Lights"
+    assert handled and app.texts == [expected] and stt.word_flags == [False]
+
+
+def test_stt_confidence_numbers_are_traced_and_never_drop_a_turn(conn):
+    handled, _, _, _ = run(conn, speech(0.8), "what time is it", "key",
+                           ranges=((0.021, 0.272), (-0.845, -0.3)))
+    assert handled
+    out = conn.execute("SELECT output FROM traces WHERE step = 'stt'").fetchone()["output"]
+    assert out == ("what time is it [no_speech_prob min 0.021 max 0.272,"
+                   " avg_logprob min -0.845 max -0.300]")
