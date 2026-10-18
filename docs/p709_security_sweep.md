@@ -122,3 +122,12 @@ A dedicated scanner is worth one run because it uses entropy rules and many vend
 - Run from the repo root, report outside the repo: `gitleaks git --redact --no-banner --report-format json --report-path <folder-outside-repo>\gl.json .` (older versions: `gitleaks detect --redact`). `--redact` keeps values out of the output; delete the report afterwards.
 - Optional: `winget install trufflesecurity.trufflehog`, then `trufflehog git file://. --no-verification --no-update`. `--no-verification` avoids live-testing any key over the network.
 - Review hits by file and commit only.
+
+## Addendum (18 Oct 2026, ~02:40 IST): gitleaks and owner verdicts
+
+- gitleaks 8.30.1 (installed with `winget install Gitleaks.Gitleaks`).
+- Command: `gitleaks git --redact --no-banner -v --report-format json --report-path <temp folder> .`
+- Output: "115 commits scanned, about 2.13 MB in 1.24 s, no leaks found".
+- gitleaks counted 115 commits; the sweep above counted 114. The cause of the difference of one was not checked.
+- The temp report file was deleted afterwards.
+- The two generic-pattern hits in `tests/test_telegram_bot.py`: the owner checked the file by eye. The values are made-up test strings (an owner id, a stranger id and a short fake secret). Verdict: test fake. The values are not written here.

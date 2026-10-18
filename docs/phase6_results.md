@@ -1,5 +1,7 @@
 # Phase 6 results: router and wake word
 
+Update 18 Oct 2026: the router model is now ON by default (commit 70e6eb8; FRIDAY_ROUTER_MODEL=0 turns it off). The text below is the G6-time record.
+
 Measured on Aditya's laptop (HP, i3, 8 GB). All figures are small samples from one person in one room, so quote the counts with them.
 
 ## Router in the graph (P6-01 to P6-03)
