@@ -25,7 +25,7 @@ By-eye counts = scored counts minus these two rows (HLD2-13 and HLD2-14 pass in 
 
 ## Caveats
 
-- The by-eye counts are my reading of the committed transcripts, not a second scorer. The scorer was not edited after the results.
+- The by-eye counts were judged by reading the saved transcripts, not by a second scorer. The scorer was not edited after the results.
 - HLD2-08 (ON only) is counted as correct: the timer is really 15 minutes, although Whisper heard "Set it MF for 15 minutes".
 - HLD2-27 to HLD2-30 are chat rows scored on routing only. Answer quality was not judged.
 - 30 rows, one speaker, one mic, one room, read from a screen, no wake phrase.
