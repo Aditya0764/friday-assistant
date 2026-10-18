@@ -2,7 +2,7 @@
 
 A voice-first personal assistant for Windows. Hold a key (or, if you turn the wake word on, say "hey friday"), speak, and Friday answers out loud. Speech recognition (Whisper), the voice (Piper), a small trained intent router and document search run on the laptop; chat answers come from Groq, with Gemini as backup. It also has a web dashboard and a Telegram bot.
 
-It is a one-person project, measured on one laptop. Every measured number below comes from a file in this repo, except the test count (run by hand) and the Telegram check (done by hand, 16 Oct 2026). Sample sizes are next to the numbers.
+It is a one-person project, measured on one laptop. Every measured number below comes from a file in this repo, except the test count (run by hand), the Telegram check (done by hand, 16 Oct 2026) and the dashboard Talk button (worked once by hand on 19 Oct 2026). Sample sizes are next to the numbers.
 
 ## Demo
 
@@ -120,7 +120,7 @@ One speaker, one laptop microphone, one set of rooms. The wake word is off by de
 
 ### Tests
 
-769 tests passed on 18 Oct 2026 (`python -m pytest -q`).
+810 tests passed on 19 Oct 2026 (`python -m pytest -q`).
 
 ## How to run
 
@@ -197,7 +197,8 @@ Create a bot with Telegram's BotFather, put the token in `.env`, send the bot a 
 ## Known limitations
 
 - **Wake word:** false triggers when music or speech plays from a speaker: 4.18 per hour live (5 events in 71.8 min, 95% interval 1.36 to 9.74), next to 0 false accepts in 7.00 h offline on a fresh overnight recording. Always read the two together.
-- **Recording without a key press:** a recording sometimes starts without a key press. The cause is unknown and no rate was measured. The speech detector drops empty clips, but noise can still become a junk turn.
+- **Stray recordings (fixed, lightly tested):** both Ctrl keys used to start a recording, because the keyboard library gives them the same scan code, so Ctrl+C or Ctrl+V anywhere could start one. Friday now reacts only to the right Ctrl key, by event name (checked by hand: a left Ctrl tap started nothing, a right Ctrl tap started one; one run). Other causes are not ruled out. Clips with almost no speech, and known Whisper phantom phrases such as "You" and "Thank you." on near-silent clips, are dropped before the chat LLM and never saved to memory. The two thresholds (2 and 5 loud 80 ms chunks) are untuned starting guesses, so a very quiet, very short real "thank you" could be dropped.
+- **Install steps not tested on a clean machine.** The numbers were measured on the dev laptop; the setup steps were not run from a fresh clone.
 - **Whisper mishears names and numbers.** In the spoken set, "eggs" was heard as "x" and "grocery" as "glossary", and two music requests played the wrong song (see `docs/p704_spoken_by_eye.md`).
 - **One speaker, one microphone, one room, one laptop.** Other voices, rooms and machines are untested.
 - **No approval flow yet.** The approval step exists in the graph and is tested, but no skill uses it, and there is no way to approve by voice, dashboard or Telegram.
@@ -205,7 +206,7 @@ Create a bot with Telegram's BotFather, put the token in `.env`, send the bot a 
 - **Windows only.**
 - **RAM of the full stack is not measured** (API, dashboard and voice together).
 - **Router misses:** in the own-phrasing test all 4 unit-conversion lines and 5 of 14 document questions that avoid the word "document" were wrong (`training/own_phrasing_results.md`).
-- **Internet needed** for chat answers; the free-plan limits of the LLM providers are in `docs/limits.md`.
+- **Internet needed** for chat answers; the free-plan limits of the LLM providers are in `docs/limits.md`. With no internet, chat answers reply "Friday couldn't answer right now." and the rule-based skills (time, calculator, lists) still work (checked by hand once).
 
 ## Security
 
