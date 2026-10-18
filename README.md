@@ -10,7 +10,7 @@ It is a one-person project, measured on one laptop. Every measured number below 
 
 ## What it can do
 
-Echo, clock (time and date), lists and notes, calculator, timers and reminders, Spotify control (play, pause, next, volume), questions about documents you give it (PDF, text, Markdown), and plain chat. Risky skills need approval before they run. Every step of every turn is saved to a local SQLite trace and shown live in the dashboard.
+Echo, clock (time and date), lists and notes, calculator, timers and reminders, Spotify control (play, pause, next, volume), questions about documents you give it (PDF, text, Markdown), and plain chat. The graph has an approval step for risky skills, but no current skill uses it (clearing a whole list is not supported yet). Every step of every turn is saved to a local SQLite trace and shown live in the dashboard.
 
 ## Architecture
 
@@ -200,6 +200,7 @@ Create a bot with Telegram's BotFather, put the token in `.env`, send the bot a 
 - **Recording without a key press:** a recording sometimes starts without a key press. The cause is unknown and no rate was measured. The speech detector drops empty clips, but noise can still become a junk turn.
 - **Whisper mishears names and numbers.** In the spoken set, "eggs" was heard as "x" and "grocery" as "glossary", and two music requests played the wrong song (see `docs/p704_spoken_by_eye.md`).
 - **One speaker, one microphone, one room, one laptop.** Other voices, rooms and machines are untested.
+- **No approval flow yet.** The approval step exists in the graph and is tested, but no skill uses it, and there is no way to approve by voice, dashboard or Telegram.
 - **Windows only.**
 - **RAM of the full stack is not measured** (API, dashboard and voice together).
 - **Router misses:** in the own-phrasing test all 4 unit-conversion lines and 5 of 14 document questions that avoid the word "document" were wrong (`training/own_phrasing_results.md`).
