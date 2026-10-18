@@ -21,6 +21,7 @@ the device named in SPOTIFY_DEVICE_NAME.
 from __future__ import annotations
 
 import os
+import re
 import threading
 import time
 from contextlib import AbstractContextManager, nullcontext
@@ -35,7 +36,8 @@ from friday.scheduler import ReminderScheduler
 from friday.skills.registry import build_registry
 from friday.spotify_client import SpotifyPlayer
 from friday.trace import Tracer
-from friday.voice.audio import DEFAULT_KEY, record_while_held
+from friday.voice.audio import DEFAULT_KEY, SAMPLE_RATE, record_while_held
+from friday.voice.endpoint import CHUNK_SECONDS, MIN_SPEECH_RMS
 from friday.voice.phrase import strip_wake_phrase
 from friday.voice.stt import get_stt
 from friday.voice.tts import get_tts
@@ -45,9 +47,41 @@ MEMORY_TURNS = 6  # one turn = your message + Friday's reply
 WAKE_FLAG = "FRIDAY_WAKEWORD"
 WAKE_LOG = Path("data") / "wake_log.csv"
 
+# Junk-turn guard. A "loud chunk" is one 80 ms piece of audio at or above MIN_SPEECH_RMS.
+# BOTH floors are STARTING GUESSES, kept low on purpose, not measured. The trace DB showed junk
+# clips were mostly under 1 s with a peak of 0.06 or less, so the gate counts loud chunks.
+MIN_LOUD_CHUNKS = 2  # fewer than this (about 0.16 s of sound): not speech, nothing is sent on
+HALLUCINATION_MAX_LOUD = 5  # a known Whisper phantom is dropped only if it has fewer (0.4 s)
+HALLUCINATIONS = frozenset(
+    {"you", "thank you", "thanks", "thanks for watching", "thank you for watching", "bye",
+     "bye bye"}
+)  # what Whisper tends to invent from silence; a real "thank you" is NOT dropped if loud enough
+CHUNK_SAMPLES = round(SAMPLE_RATE * CHUNK_SECONDS)  # 1280
+
 
 def wake_enabled() -> bool:
     return os.environ.get(WAKE_FLAG, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def loud_chunks(audio: np.ndarray) -> int:
+    """How many 80 ms chunks of this float32 clip are loud enough to be speech."""
+    count = 0
+    for start in range(0, len(audio), CHUNK_SAMPLES):
+        chunk = audio[start : start + CHUNK_SAMPLES]
+        if len(chunk) and float(np.sqrt(np.mean(chunk * chunk))) >= MIN_SPEECH_RMS:
+            count += 1
+    return count
+
+
+def is_known_hallucination(text: str) -> bool:
+    """True for text with no words, or a known phantom phrase (alone or repeated)."""
+    words = re.sub(r"[^a-z0-9' ]+", " ", text.lower()).split()
+    if not words:  # only dots and punctuation, like "... ... ..."
+        return True
+    for size in (1, 2, 3):  # "thank you thank you thank you" is the phrase "thank you" x3
+        if len(words) % size == 0 and words == words[:size] * (len(words) // size):
+            return " ".join(words[:size]) in HALLUCINATIONS
+    return " ".join(words) in HALLUCINATIONS
 
 
 def load_history(conn) -> list[dict]:
@@ -75,19 +109,30 @@ def process_capture(
     started = time.perf_counter() if started is None else started  # start of the timing below
 
     tracer = Tracer(conn)
-    tracer.log("record", "", f"{seconds:.1f} s, peak {peak:.2f}, via {source}", 0)
+    loud = loud_chunks(audio)
+    tracer.log("record", "", f"{seconds:.1f} s, peak {peak:.2f}, via {source}, loud {loud}", 0)
 
     if seconds < MIN_SECONDS:
         print("Too short, ignored.")
         return False
 
+    if loud < MIN_LOUD_CHUNKS:  # no real speech: do not even run STT, Whisper would invent text
+        tracer.log("dropped", "", f"not enough speech ({loud} loud chunks)", 0)
+        print(f"Not enough speech ({loud} loud chunks), ignored.")
+        return False
+
     with tracer.step("stt", f"{seconds:.1f} s of audio") as out:
-        heard = stt.transcribe(audio, vad=source != "key")
+        heard = stt.transcribe(audio, vad=True)
         out["output"] = heard.text
     print(f"You: {heard.text!r}  (STT {heard.ms} ms)")
 
     if not heard.text:
         print("Heard nothing, ignored.")
+        return False
+
+    if loud < HALLUCINATION_MAX_LOUD and is_known_hallucination(heard.text):
+        tracer.log("dropped", heard.text, f"known Whisper phantom, {loud} loud chunks", 0)
+        print(f"Looks like a Whisper phantom with little speech ({loud} loud chunks), ignored.")
         return False
 
     text = heard.text
